@@ -15,7 +15,8 @@
     "db:status": "prisma migrate status",
     "db:check": "node --conditions=react-server --import tsx scripts/check-database.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "setup:installation": "node --conditions=react-server --import tsx scripts/setup-installation.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
@@ -26,9 +27,11 @@
     "pg": "8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@inquirer/prompts": "^8.7.5",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "24.19.2",
     "@types/pg": "^8.23.1",

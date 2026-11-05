@@ -92,3 +92,23 @@ La contraseña no se recorta ni se modifica automaticamente.
 
 Esta politica debe validarse en el servidor antes de generar
 el hash. La validacion del navegador sera solo una ayuda de UX.
+
+### Inicializacion de la instalacion
+
+Con las migraciones aplicadas:
+
+    npm run setup:installation
+
+El comando solicita los datos de la finca y del primer Administrador.
+La contraseña se introduce de forma oculta y no se guarda en archivos.
+
+Solo funciona cuando no existen fincas ni usuarios.
+La creacion de ambos registros se realiza en una transaccion.
+
+No es un comando para restablecer acceso ni reparar datos.
+
+El Administrador se crea activo y debe cambiar su contraseña
+en el primer acceso. El login se implementa en un bloque posterior.
+
+No ejecutar automaticamente durante instalaciones de dependencias,
+compilaciones o despliegues.
