@@ -12,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
-    "db:status": "prisma migrate status"
+    "db:status": "prisma migrate status",
+    "db:check": "node --conditions=react-server --import tsx scripts/check-database.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
@@ -21,7 +22,8 @@
     "next": "16.4.5",
     "pg": "8.23.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -33,6 +35,7 @@
     "eslint-config-next": "16.4.5",
     "prisma": "7.10.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

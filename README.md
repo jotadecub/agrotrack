@@ -21,3 +21,21 @@ No publicar `.env` ni utilizar estas credenciales en producción.
 
 Las migraciones se versionan en Git.
 El cliente generado de Prisma no se versiona.
+
+### Comprobar la conexión
+
+Ejecutar:
+
+    npm run db:check
+
+La comprobación utiliza el cliente de Prisma del servidor,
+consulta PostgreSQL y cuenta los registros de configuración
+de la finca.
+
+No crea ni modifica datos.
+
+En una instalación recién migrada se esperan cero registros
+de finca.
+
+El comando utiliza la condición `react-server` para cargar
+el módulo protegido con `server-only` fuera de Next.js.
