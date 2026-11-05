@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Base de datos local
 
-## Getting Started
+El proyecto utiliza PostgreSQL y Prisma ORM 7.
 
-First, run the development server:
+### Configuración
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Crear una base PostgreSQL exclusiva para desarrollo.
+2. Copiar `.env.example` como `.env`.
+3. Completar `DATABASE_URL` con las credenciales locales.
+4. Ejecutar:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+   npm ci
+   npm run db:generate
+   npm run db:migrate
+   npm run db:status
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+El usuario local necesita crear bases para la shadow database
+utilizada por Prisma Migrate durante el desarrollo.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+No publicar `.env` ni utilizar estas credenciales en producción.
 
-## Learn More
+Las migraciones se versionan en Git.
+El cliente generado de Prisma no se versiona.
 
-To learn more about Next.js, take a look at the following resources:
+### Comprobar la conexión
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Ejecutar:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+    npm run db:check
 
-## Deploy on Vercel
+La comprobación utiliza el cliente de Prisma del servidor,
+consulta PostgreSQL y cuenta los registros de configuración
+de la finca.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+No crea ni modifica datos.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+En una instalación recién migrada se esperan cero registros
+de finca.
+
+El comando utiliza la condición `react-server` para cargar
+el módulo protegido con `server-only` fuera de Next.js.
