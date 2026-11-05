@@ -52,3 +52,43 @@ La migración no crea cuentas ni contraseñas predeterminadas.
 
 La autenticación y el procedimiento de creación del primer
 Administrador se implementarán en los siguientes bloques.
+
+### Almacenamiento de contraseñas
+
+El servidor utiliza Argon2id con:
+
+- Memoria: 19 MiB.
+- Iteraciones: 2.
+- Paralelismo: 1.
+
+La biblioteca genera una sal aleatoria para cada hash.
+
+El módulo no guarda contraseñas ni consulta la base de datos.
+La política de contraseñas se aplicará en los servicios de
+creación y cambio de credenciales.
+
+### Pruebas automáticas
+
+Ejecutar todas las pruebas:
+
+    npm test
+
+Ejecutar en modo observación:
+
+    npm run test:watch
+
+Las pruebas de contraseñas utilizan Argon2 real y no requieren
+conexión con PostgreSQL.
+
+### Politica de contraseñas
+
+Las contraseñas nuevas deben tener entre 15 y 128 caracteres.
+
+No se permiten espacios, tabulaciones ni saltos de linea.
+No se exigen mayusculas, numeros ni simbolos.
+Se permiten caracteres Unicode.
+
+La contraseña no se recorta ni se modifica automaticamente.
+
+Esta politica debe validarse en el servidor antes de generar
+el hash. La validacion del navegador sera solo una ayuda de UX.
