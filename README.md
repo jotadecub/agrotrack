@@ -39,3 +39,16 @@ de finca.
 
 El comando utiliza la condición `react-server` para cargar
 el módulo protegido con `server-only` fuera de Next.js.
+
+### Usuarios
+
+El esquema incluye usuarios con los roles ADMIN, SUPERVISOR y READER.
+
+La identificación es única en toda la instalación y se almacena
+como texto.
+
+Las contraseñas deben almacenarse únicamente como hashes.
+La migración no crea cuentas ni contraseñas predeterminadas.
+
+La autenticación y el procedimiento de creación del primer
+Administrador se implementarán en los siguientes bloques.
