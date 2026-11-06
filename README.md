@@ -248,3 +248,27 @@ No utilizar agrotrack_dev para limpieza de datos de pruebas.
 
 Los comandos anteriores preparan la base; todavia no ejecutan
 pruebas de integracion.
+
+### Pruebas de integracion
+
+Preparar la base aislada:
+
+    npm run db:test:migrate
+
+Ejecutar:
+
+    npm run test:integration
+
+Las pruebas utilizan PostgreSQL, Prisma, Argon2 y JWT reales.
+Solo se sustituye el marcador server-only.
+
+Antes de crear datos se verifica el nombre de la base y el usuario.
+
+Cada prueba elimina exclusivamente sus propios usuarios y sesiones.
+No se utiliza TRUNCATE ni se reinicia la base.
+
+Las pruebas cubren creacion, bloqueo de usuarios, revocacion,
+inactividad, vencimiento absoluto, rotacion, un escenario de
+concurrencia y rollback ante fallos de firma.
+
+No prueban todavia cookies, endpoints, CSRF ni navegadores.

@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "setup:installation": "node --conditions=react-server --import tsx scripts/setup-installation.ts",
     "db:test:migrate": "prisma migrate deploy --config prisma.test.config.ts",
-    "db:test:status": "prisma migrate status --config prisma.test.config.ts"
+    "db:test:status": "prisma migrate status --config prisma.test.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
