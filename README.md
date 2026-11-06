@@ -272,3 +272,19 @@ inactividad, vencimiento absoluto, rotacion, un escenario de
 concurrencia y rollback ante fallos de firma.
 
 No prueban todavia cookies, endpoints, CSRF ni navegadores.
+
+### Autenticacion web: primer bloque
+
+Se agrego la capa inicial de cookies y proteccion de origen.
+
+- Cookies HttpOnly y SameSite=Strict.
+- Secure automatico en produccion.
+- Verificacion de Origin en peticiones de escritura.
+- Endpoint inicial de login.
+- Limite local de cinco intentos por IP en 15 minutos.
+
+El limite de intentos todavia esta en memoria y se reinicia
+al reiniciar el servidor. Debe moverse a almacenamiento
+persistente antes de produccion.
+
+Las cookies no sustituyen la autorizacion por rol.
