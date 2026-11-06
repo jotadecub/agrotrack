@@ -223,3 +223,28 @@ Pendiente antes de integrar en la web:
 - Pruebas reales de concurrencia y rollback en PostgreSQL.
 
 Las pruebas unitarias utilizan dependencias simuladas.
+
+### Base local para pruebas de integracion
+
+Las pruebas utilizaran una base separada:
+
+- Base: agrotrack_test.
+- Usuario: agrotrack_test.
+- Configuracion privada: .env.test.
+
+Aplicar las migraciones existentes:
+
+    npm run db:test:migrate
+
+Consultar su estado:
+
+    npm run db:test:status
+
+La configuracion rechaza destinos distintos del entorno local
+de pruebas esperado.
+
+No ejecutar setup:installation contra esta base.
+No utilizar agrotrack_dev para limpieza de datos de pruebas.
+
+Los comandos anteriores preparan la base; todavia no ejecutan
+pruebas de integracion.
