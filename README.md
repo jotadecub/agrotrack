@@ -125,3 +125,20 @@ No se almacenan contraseñas ni JWT completos en esta tabla.
 
 La emision de tokens, validacion de sesiones y cierre de sesion
 se implementan en bloques posteriores.
+
+### Tokens de autenticacion
+
+Los tokens se firman y verifican mediante jose con HS256.
+
+AUTH_JWT_SECRET debe contener 32 bytes aleatorios representados
+como 64 caracteres hexadecimales. Cada instalacion debe utilizar
+un secreto diferente.
+
+El token contiene identificadores internos y fechas.
+No contiene contraseñas, datos personales ni permisos.
+
+La verificacion criptografica no sustituye la consulta de
+la sesion y el estado actual del usuario en PostgreSQL.
+
+La duracion y renovacion de sesiones se configuran en el servicio
+de autenticacion, no en este modulo.
