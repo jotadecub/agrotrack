@@ -326,3 +326,18 @@ elimina las cookies y responde de forma uniforme.
 
 No revoca otras sesiones del mismo usuario. Esa accion requerira
 una operacion explicita y autorizada en el futuro.
+
+### Renovacion coordinada
+
+Se agrego el endpoint `/api/auth/refresh` y una utilidad cliente
+para reintentar peticiones despues de renovar la sesion.
+
+El endpoint lee el `sessionId` del JWT de acceso y valida la
+credencial de renovacion contra PostgreSQL. La credencial anterior
+deja de ser valida tras una renovacion exitosa.
+
+El cliente realiza una sola renovacion para peticiones concurrentes
+y reintenta la peticion original una vez.
+
+La credencial de renovacion permanece en una cookie HttpOnly.
+No se almacena en localStorage ni sessionStorage.
