@@ -298,3 +298,21 @@ Los usuarios nuevos tienen este valor nulo. El login devuelve
 
 El siguiente paso restringira las operaciones mientras el cambio
 de contrasena este pendiente.
+
+### Cambio obligatorio de contrasena
+
+Se agrego el cambio de contrasena para usuarios con
+`mustChangePassword = true`.
+
+El servicio verifica la contrasena actual, aplica la politica
+de contrasenas y actualiza el hash dentro de una transaccion.
+
+Al cambiarla:
+
+- Se marca el cambio como completado.
+- Se registra `passwordChangedAt`.
+- Se revocan todas las sesiones activas anteriores.
+- Se crea una nueva sesion.
+
+El endpoint requiere una sesion valida y verifica el origen.
+No permite cambiar la contrasena de un usuario inactivo.
