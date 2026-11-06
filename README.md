@@ -142,3 +142,19 @@ la sesion y el estado actual del usuario en PostgreSQL.
 
 La duracion y renovacion de sesiones se configuran en el servicio
 de autenticacion, no en este modulo.
+
+### Politica de sesiones
+
+- JWT de acceso: 15 minutos.
+- Inactividad maxima: 30 minutos.
+- Duracion absoluta: 8 horas.
+
+La renovacion no amplia la duracion absoluta.
+Las renovaciones automaticas no cuentan como actividad.
+
+La credencial de renovacion se genera con 32 bytes aleatorios.
+La base de datos conserva unicamente su hash SHA-256.
+
+En este bloque se incorporan el esquema y las utilidades.
+El servicio que aplica la politica y los endpoints se
+implementan posteriormente.

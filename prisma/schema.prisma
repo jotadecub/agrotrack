@@ -51,11 +51,13 @@ model User {
 }
 
 model Session {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
-  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.Char(64)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastActivityAt   DateTime  @default(now()) @map("last_activity_at") @db.Timestamptz(3)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
