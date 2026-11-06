@@ -316,3 +316,13 @@ Al cambiarla:
 
 El endpoint requiere una sesion valida y verifica el origen.
 No permite cambiar la contrasena de un usuario inactivo.
+
+### Cierre de sesion
+
+Se agrego el cierre de sesion por sesion individual.
+
+El endpoint revoca la sesion identificada por el JWT de acceso,
+elimina las cookies y responde de forma uniforme.
+
+No revoca otras sesiones del mismo usuario. Esa accion requerira
+una operacion explicita y autorizada en el futuro.
