@@ -15,3 +15,53 @@ model Farm {
 
   @@map("farm")
 }
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  READER
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("user_status")
+}
+
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  identification     String     @unique @db.VarChar(50)
+  fullName           String     @map("full_name") @db.VarChar(150)
+  email              String     @db.VarChar(254)
+  phone              String?    @db.VarChar(30)
+  address            String?    @db.VarChar(250)
+  passwordHash       String     @map("password_hash") @db.Text
+  role               UserRole   @default(READER)
+  status             UserStatus @default(ACTIVE)
+  mustChangePassword Boolean    @default(true) @map("must_change_password")
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions Session[]
+
+  @@map("app_user")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.Char(64)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastActivityAt   DateTime  @default(now()) @map("last_activity_at") @db.Timestamptz(3)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("auth_session")
+}
