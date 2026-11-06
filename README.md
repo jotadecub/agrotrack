@@ -341,3 +341,15 @@ y reintenta la peticion original una vez.
 
 La credencial de renovacion permanece en una cookie HttpOnly.
 No se almacena en localStorage ni sessionStorage.
+
+### Autorizacion por rol
+
+Se agrego una capa de autorizacion en el servidor.
+
+- Administrador: control total.
+- Supervisor: operaciones operativas y consulta.
+- Lector: consulta unicamente.
+
+Las funciones de autorizacion se usaran en los endpoints.
+La interfaz podra ocultar acciones, pero la decision final
+siempre correspondera al servidor.
