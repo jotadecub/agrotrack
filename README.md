@@ -353,3 +353,14 @@ Se agrego una capa de autorizacion en el servidor.
 Las funciones de autorizacion se usaran en los endpoints.
 La interfaz podra ocultar acciones, pero la decision final
 siempre correspondera al servidor.
+
+### Sesion actual
+
+Se agrego `/api/auth/me`.
+
+El endpoint valida la sesion, registra actividad y devuelve
+unicamente los datos necesarios para la interfaz.
+
+No expone el hash de contrasena, correo, telefono ni direccion.
+La autorizacion por rol seguira aplicandose en los endpoints
+operativos.
