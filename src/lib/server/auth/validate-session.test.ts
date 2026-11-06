@@ -49,6 +49,7 @@ describe("validateAccessToken", () => {
         role: "ADMIN",
         status: "ACTIVE",
         mustChangePassword: true,
+        passwordChangedAt: null,
       },
     };
   }
@@ -82,6 +83,7 @@ describe("validateAccessToken", () => {
         fullName: "Administrador Demo",
         role: "ADMIN",
         mustChangePassword: true,
+        passwordChangedAt: null,
       },
     });
 
