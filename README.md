@@ -178,3 +178,23 @@ Las pruebas de transacciones reales y concurrencia estan pendientes.
 
 La validacion de sesiones, el control de inactividad y la
 renovacion se implementan en bloques posteriores.
+
+### Validacion de acceso
+
+La validacion comprueba el JWT, su correspondencia con la sesion,
+la revocacion, el vencimiento absoluto, la inactividad y el
+estado actual del usuario.
+
+El rol y la obligacion de cambiar contraseña se leen de PostgreSQL.
+
+Por defecto no actualiza la actividad.
+Las peticiones que correspondan deben solicitarlo desde codigo
+del servidor; las renovaciones no deben hacerlo.
+
+Los fallos de infraestructura se propagan y no conceden acceso.
+
+La autorizacion por rol, el cambio obligatorio de contraseña
+y las cookies se implementan en bloques posteriores.
+
+Las pruebas de este servicio son unitarias con dependencias
+simuladas; no sustituyen pruebas de integracion.
