@@ -198,3 +198,28 @@ y las cookies se implementan en bloques posteriores.
 
 Las pruebas de este servicio son unitarias con dependencias
 simuladas; no sustituyen pruebas de integracion.
+
+### Renovacion de sesiones
+
+La renovacion requiere el ID de sesion y su credencial actual.
+
+En una transaccion se sustituye el hash de renovacion y se
+firma un JWT nuevo.
+
+La renovacion:
+- No modifica lastActivityAt.
+- No amplia expiresAt.
+- No emite un JWT que supere el vencimiento absoluto.
+- Rechaza sesiones revocadas, inactivas o vencidas.
+- Rechaza usuarios desactivados.
+
+La credencial anterior deja de coincidir con el hash guardado.
+
+Pendiente antes de integrar en la web:
+- Cookies y proteccion CSRF/origen.
+- Coordinacion de renovaciones entre peticiones y pestañas.
+- Comportamiento si se pierde la respuesta tras confirmar la rotacion.
+- Evaluacion de deteccion de reutilizacion de credenciales antiguas.
+- Pruebas reales de concurrencia y rollback en PostgreSQL.
+
+Las pruebas unitarias utilizan dependencias simuladas.
