@@ -288,3 +288,13 @@ al reiniciar el servidor. Debe moverse a almacenamiento
 persistente antes de produccion.
 
 Las cookies no sustituyen la autorizacion por rol.
+
+### Cambio obligatorio de contrasena
+
+Se agrego `passwordChangedAt` como campo opcional.
+
+Los usuarios nuevos tienen este valor nulo. El login devuelve
+`mustChangePassword`, pero no expone `passwordChangedAt`.
+
+El siguiente paso restringira las operaciones mientras el cambio
+de contrasena este pendiente.
