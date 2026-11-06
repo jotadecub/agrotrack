@@ -158,3 +158,23 @@ La base de datos conserva unicamente su hash SHA-256.
 En este bloque se incorporan el esquema y las utilidades.
 El servicio que aplica la politica y los endpoints se
 implementan posteriormente.
+
+### Servicio de sesiones
+
+El servicio interno permite:
+
+- Crear sesiones para usuarios activos.
+- Emitir el JWT inicial.
+- Guardar el hash de la credencial de renovacion.
+- Revocar una sesion o todas las de un usuario.
+
+La creacion utiliza una transaccion Serializable.
+
+Este servicio no comprueba contraseñas ni autoriza endpoints.
+Sus credenciales no deben devolverse como JSON al navegador.
+
+Las pruebas unitarias sustituyen PostgreSQL y la firma de JWT.
+Las pruebas de transacciones reales y concurrencia estan pendientes.
+
+La validacion de sesiones, el control de inactividad y la
+renovacion se implementan en bloques posteriores.
