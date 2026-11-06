@@ -112,3 +112,16 @@ en el primer acceso. El login se implementa en un bloque posterior.
 
 No ejecutar automaticamente durante instalaciones de dependencias,
 compilaciones o despliegues.
+
+### Sesiones
+
+El esquema incluye sesiones asociadas a usuarios mediante
+la tabla auth_session.
+
+Cada sesion tiene fecha de creacion, vencimiento y revocacion
+opcional.
+
+No se almacenan contraseñas ni JWT completos en esta tabla.
+
+La emision de tokens, validacion de sesiones y cierre de sesion
+se implementan en bloques posteriores.
