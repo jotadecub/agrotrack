@@ -26,21 +26,38 @@ export type AnimalListItem = {
   isActive: boolean;
 };
 
+type AnimalChangeData = {
+  name?: string | null;
+  breedId?: number | null;
+  sex?: "FEMALE" | "MALE" | "UNKNOWN";
+  birthDate?: Date | null;
+  weightKg?: string | null;
+  motherId?: string | null;
+  fatherId?: string | null;
+  status?:
+    | "ALIVE"
+    | "DEAD"
+    | "SOLD"
+    | "SICK"
+    | "TRANSFERRED";
+  isActive?: boolean;
+};
+
 function toAnimalListItem(
-  animal: Prisma.AnimalGetPayload<{
-    select: {
-      id: true;
-      code: true;
-      name: true;
-      sex: true;
-      status: true;
-      birthDate: true;
-      weightKg: true;
-      speciesId: true;
-      breedId: true;
-      isActive: true;
-    };
-  }>,
+  animal: {
+    id: string;
+    code: string;
+    name: string | null;
+    sex: "FEMALE" | "MALE" | "UNKNOWN";
+    status: "ALIVE" | "DEAD" | "SOLD" | "SICK" | "TRANSFERRED";
+    birthDate: Date | null;
+    weightKg: Prisma.Decimal | null;
+    speciesId: number;
+    breedId: number | null;
+    isActive: boolean;
+    motherId: string | null;
+    fatherId: string | null;
+  },
 ): AnimalListItem {
   return {
     id: animal.id,
@@ -109,37 +126,66 @@ export async function createAnimal(
     }
   }
 
-  try {
-    const animal = await db.animal.create({
-      data: {
-        farmId: farm.id,
-        code: input.code,
-        name: input.name,
-        speciesId: input.speciesId,
-        breedId: input.breedId,
-        sex: input.sex,
-        birthDate: input.birthDate,
-        weightKg:
-          input.weightKg === null
-            ? null
-            : new Prisma.Decimal(input.weightKg),
-        motherId: input.motherId,
-        fatherId: input.fatherId,
-        status: input.status,
-        createdById,
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        sex: true,
-        status: true,
-        birthDate: true,
-        weightKg: true,
-        speciesId: true,
-        breedId: true,
-        isActive: true,
-      },
+    try {
+    const animal = await db.$transaction(async (tx) => {
+      const created = await tx.animal.create({
+        data: {
+          farmId: farm.id,
+          code: input.code,
+          name: input.name,
+          speciesId: input.speciesId,
+          breedId: input.breedId,
+          sex: input.sex,
+          birthDate: input.birthDate,
+          weightKg:
+            input.weightKg === null
+              ? null
+              : new Prisma.Decimal(input.weightKg),
+          motherId: input.motherId,
+          fatherId: input.fatherId,
+          status: input.status,
+          createdById,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          sex: true,
+          status: true,
+          birthDate: true,
+          weightKg: true,
+          speciesId: true,
+          breedId: true,
+          isActive: true,
+          motherId: true,
+          fatherId: true,
+        },
+      });
+
+      await tx.animalChangeLog.create({
+        data: {
+          animalId: created.id,
+          action: "CREATED",
+          changedById: createdById,
+          previousData: Prisma.JsonNull,
+          newData: {
+            name: created.name,
+            breedId: created.breedId,
+            sex: created.sex,
+            birthDate: created.birthDate,
+            weightKg:
+              created.weightKg === null
+                ? null
+                : created.weightKg.toString(),
+            motherId: created.motherId,
+            fatherId: created.fatherId,
+            status: created.status,
+            isActive: created.isActive,
+          },
+        },
+      });
+
+      return created;
     });
 
     return toAnimalListItem(animal);
@@ -213,6 +259,8 @@ export async function listAnimals(
         speciesId: true,
         breedId: true,
         isActive: true,
+        motherId: true,
+        fatherId: true,
       },
     }),
     db.animal.count({
@@ -247,6 +295,8 @@ export async function getAnimalById(
       speciesId: true,
       breedId: true,
       isActive: true,
+      motherId: true,
+      fatherId: true,
     },
   });
 
@@ -364,40 +414,106 @@ export async function updateAnimal(
     }
   }
 
-  try {
-    const animal = await db.animal.update({
-      where: {
-        id,
-      },
-      data: {
-        name: input.name,
-        breedId: input.breedId,
-        sex: input.sex,
-        birthDate: input.birthDate,
+    try {
+    const animal = await db.$transaction(async (tx) => {
+      const current = await tx.animal.findUniqueOrThrow({
+        where: {
+          id,
+        },
+        select: {
+          name: true,
+          breedId: true,
+          sex: true,
+          birthDate: true,
+          weightKg: true,
+          motherId: true,
+          fatherId: true,
+          status: true,
+          isActive: true,
+        },
+      });
+
+      const previousData: AnimalChangeData = {
+        name: current.name,
+        breedId: current.breedId,
+        sex: current.sex,
+        birthDate: current.birthDate,
         weightKg:
-          input.weightKg === undefined
-            ? undefined
-            : input.weightKg === null
-              ? null
-              : new Prisma.Decimal(input.weightKg),
-        motherId: input.motherId,
-        fatherId: input.fatherId,
-        status: input.status,
-        isActive: input.isActive,
-        updatedById,
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        sex: true,
-        status: true,
-        birthDate: true,
-        weightKg: true,
-        speciesId: true,
-        breedId: true,
-        isActive: true,
-      },
+          current.weightKg === null
+            ? null
+            : current.weightKg.toString(),
+        motherId: current.motherId,
+        fatherId: current.fatherId,
+        status: current.status,
+        isActive: current.isActive,
+      };
+
+      const updated = await tx.animal.update({
+        where: {
+          id,
+        },
+        data: {
+          name: input.name,
+          breedId: input.breedId,
+          sex: input.sex,
+          birthDate: input.birthDate,
+          weightKg:
+            input.weightKg === undefined
+              ? undefined
+              : input.weightKg === null
+                ? null
+                : new Prisma.Decimal(input.weightKg),
+          motherId: input.motherId,
+          fatherId: input.fatherId,
+          status: input.status,
+          isActive: input.isActive,
+          updatedById,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          sex: true,
+          status: true,
+          birthDate: true,
+          weightKg: true,
+          speciesId: true,
+          breedId: true,
+          isActive: true,
+          motherId: true,
+          fatherId: true,
+        },
+      });
+
+      const newData: AnimalChangeData = {
+        name: updated.name,
+        breedId: updated.breedId,
+        sex: updated.sex,
+        birthDate: updated.birthDate,
+        weightKg:
+          updated.weightKg === null
+            ? null
+            : updated.weightKg.toString(),
+        motherId: updated.motherId,
+        fatherId: updated.fatherId,
+        status: updated.status,
+        isActive: updated.isActive,
+      };
+
+      const wasActive = current.isActive;
+      const isActive = updated.isActive;
+
+      await tx.animalChangeLog.create({
+        data: {
+          animalId: updated.id,
+          action: wasActive && !isActive ? "DEACTIVATED" : "UPDATED",
+          changedById: updatedById,
+          previousData,
+          newData,
+        },
+      });
+
+      return updated;
     });
 
     return toAnimalListItem(animal);

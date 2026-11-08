@@ -403,4 +403,58 @@ describe("animales", () => {
       name: "AnimalRelationshipError",
     });
   });
+
+    it("registra creacion actualizacion y desactivacion en el historial", async () => {
+    const created = await createAnimal(
+      {
+        code: `HISTORIAL-${randomUUID()}`,
+        name: "Animal historial",
+        speciesId: requiredSpeciesId(),
+        breedId: null,
+        sex: "FEMALE",
+        birthDate: null,
+        weightKg: null,
+        motherId: null,
+        fatherId: null,
+        status: "ALIVE",
+      },
+      requiredAdminId(),
+    );
+
+    await updateAnimal(
+      created.id,
+      {
+        name: "Animal historial actualizado",
+      },
+      requiredAdminId(),
+    );
+
+    await updateAnimal(
+      created.id,
+      {
+        isActive: false,
+      },
+      requiredAdminId(),
+    );
+
+    const logs = await db.animalChangeLog.findMany({
+      where: {
+        animalId: created.id,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    expect(logs).toHaveLength(3);
+    expect(logs[0]?.action).toBe("CREATED");
+    expect(logs[1]?.action).toBe("UPDATED");
+    expect(logs[2]?.action).toBe("DEACTIVATED");
+    expect(logs[2]?.previousData).toMatchObject({
+      isActive: true,
+    });
+    expect(logs[2]?.newData).toMatchObject({
+      isActive: false,
+    });
+  });
 });
