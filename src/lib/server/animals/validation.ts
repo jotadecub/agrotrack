@@ -14,12 +14,37 @@ export const animalStatusValues = [
   "TRANSFERRED",
 ] as const;
 
-const optionalTrimmedString = z
+const optionalNullableText = z
   .string()
   .trim()
   .max(150)
-  .optional()
-  .transform((value) => (value === "" ? undefined : value));
+  .nullish()
+  .transform((value) => (value === "" || value === undefined ? null : value));
+
+const optionalNullableId = z
+  .string()
+  .uuid()
+  .nullish()
+  .transform((value) => (value === "" || value === undefined ? null : value));
+
+const optionalNullableNumber = z.coerce
+  .number()
+  .positive("El peso debe ser mayor a cero.")
+  .max(10000, "El peso no puede superar 10000 kg.")
+  .nullish()
+  .transform((value) => (value === undefined ? null : value));
+
+const optionalNullableDate = z.coerce
+  .date()
+  .nullish()
+  .transform((value) => (value === undefined ? null : value));
+
+const optionalNullableBreedId = z.coerce
+  .number()
+  .int()
+  .positive()
+  .nullish()
+  .transform((value) => (value === 0 || value === undefined ? null : value));
 
 export const createAnimalSchema = z
   .object({
@@ -28,33 +53,17 @@ export const createAnimalSchema = z
       .trim()
       .min(1, "El código es obligatorio.")
       .max(50, "El código no puede superar 50 caracteres."),
-    name: optionalTrimmedString,
+    name: optionalNullableText,
     speciesId: z.coerce
       .number()
       .int()
       .positive("La especie es obligatoria."),
-    breedId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .nullable()
-      .transform((value) => (value === 0 ? null : value)),
+    breedId: optionalNullableBreedId,
     sex: z.enum(animalSexValues).default("UNKNOWN"),
-    birthDate: z.coerce
-      .date()
-      .optional()
-      .nullable()
-      .transform((value) => (value ? value : null)),
-    weightKg: z.coerce
-      .number()
-      .positive("El peso debe ser mayor a cero.")
-      .max(10000, "El peso no puede superar 10000 kg.")
-      .optional()
-      .nullable()
-      .transform((value) => (value === 0 ? null : value)),
-    motherId: z.string().uuid().optional().nullable(),
-    fatherId: z.string().uuid().optional().nullable(),
+    birthDate: optionalNullableDate,
+    weightKg: optionalNullableNumber,
+    motherId: optionalNullableId,
+    fatherId: optionalNullableId,
     status: z.enum(animalStatusValues).default("ALIVE"),
   })
   .strict();
@@ -78,13 +87,16 @@ export const listAnimalsQuerySchema = z
       .string()
       .trim()
       .max(100)
-      .optional(),
+      .nullish()
+      .transform((value) => (value === "" || value === undefined ? undefined : value)),
     speciesId: z.coerce
       .number()
       .int()
       .positive()
-      .optional(),
-    status: z.enum(animalStatusValues).optional(),
+      .nullish()
+      .transform((value) => (value === 0 || value === undefined ? undefined : value)),
+    status: z.enum(animalStatusValues).nullish()
+      .transform((value) => (value === undefined ? undefined : value)),
   })
   .strict();
 

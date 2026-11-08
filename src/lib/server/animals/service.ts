@@ -1,4 +1,4 @@
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "../../../generated/prisma/client";
 
 import { db } from "../db";
 import {
@@ -112,17 +112,17 @@ export async function createAnimal(
       data: {
         farmId: farm.id,
         code: input.code,
-        name: input.name ?? null,
+        name: input.name,
         speciesId: input.speciesId,
-        breedId: input.breedId ?? null,
+        breedId: input.breedId,
         sex: input.sex,
-        birthDate: input.birthDate ?? null,
+        birthDate: input.birthDate,
         weightKg:
-          input.weightKg === null || input.weightKg === undefined
+          input.weightKg === null
             ? null
             : new Prisma.Decimal(input.weightKg),
-        motherId: input.motherId ?? null,
-        fatherId: input.fatherId ?? null,
+        motherId: input.motherId,
+        fatherId: input.fatherId,
         status: input.status,
         createdById,
       },
