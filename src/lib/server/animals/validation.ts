@@ -101,3 +101,58 @@ export const listAnimalsQuerySchema = z
   .strict();
 
 export type ListAnimalsQuery = z.infer<typeof listAnimalsQuerySchema>;
+
+export const updateAnimalSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .max(150)
+      .nullable()
+      .optional(),
+    breedId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional(),
+    sex: z.enum(animalSexValues).optional(),
+    birthDate: z.coerce
+      .date()
+      .nullable()
+      .optional(),
+    weightKg: z.coerce
+      .number()
+      .positive("El peso debe ser mayor a cero.")
+      .max(10000, "El peso no puede superar 10000 kg.")
+      .nullable()
+      .optional(),
+    motherId: z.string().uuid().nullable().optional(),
+    fatherId: z.string().uuid().nullable().optional(),
+    status: z.enum(animalStatusValues).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .strict()
+  .refine(
+    (data) => Object.values(data).some((value) => value !== undefined),
+    {
+      message: "Debes enviar al menos un campo para actualizar.",
+    },
+  );
+
+export type UpdateAnimalInput = {
+  name?: string | null;
+  breedId?: number | null;
+  sex?: "FEMALE" | "MALE" | "UNKNOWN";
+  birthDate?: Date | null;
+  weightKg?: number | null;
+  motherId?: string | null;
+  fatherId?: string | null;
+  status?:
+    | "ALIVE"
+    | "DEAD"
+    | "SOLD"
+    | "SICK"
+    | "TRANSFERRED";
+  isActive?: boolean;
+};

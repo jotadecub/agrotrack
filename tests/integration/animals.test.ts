@@ -18,6 +18,7 @@ import { hashPassword } from "../../src/lib/server/auth/password";
 import {
   createAnimal,
   listAnimals,
+  updateAnimal,
 } from "../../src/lib/server/animals/service";
 
 describe("animales", () => {
@@ -284,5 +285,122 @@ describe("animales", () => {
     expect(result.pageSize).toBe(20);
     expect(result.total).toBeGreaterThan(0);
     expect(result.items.length).toBeGreaterThan(0);
+  });
+
+    it("actualiza el nombre y estado de un animal", async () => {
+    const created = await createAnimal(
+      {
+        code: `ACTUALIZAR-${randomUUID()}`,
+        name: "Nombre inicial",
+        speciesId: requiredSpeciesId(),
+        breedId: null,
+        sex: "FEMALE",
+        birthDate: null,
+        weightKg: null,
+        motherId: null,
+        fatherId: null,
+        status: "ALIVE",
+      },
+      requiredAdminId(),
+    );
+
+    const updated = await updateAnimal(
+      created.id,
+      {
+        name: "Nombre actualizado",
+        status: "SICK",
+      },
+      requiredAdminId(),
+    );
+
+    expect(updated.id).toBe(created.id);
+    expect(updated.name).toBe("Nombre actualizado");
+    expect(updated.status).toBe("SICK");
+  });
+
+  it("desactiva un animal sin eliminarlo", async () => {
+    const created = await createAnimal(
+      {
+        code: `DESACTIVAR-${randomUUID()}`,
+        name: null,
+        speciesId: requiredSpeciesId(),
+        breedId: null,
+        sex: "MALE",
+        birthDate: null,
+        weightKg: null,
+        motherId: null,
+        fatherId: null,
+        status: "ALIVE",
+      },
+      requiredAdminId(),
+    );
+
+    const updated = await updateAnimal(
+      created.id,
+      {
+        isActive: false,
+      },
+      requiredAdminId(),
+    );
+
+    expect(updated.isActive).toBe(false);
+
+    const listed = await listAnimals({
+      page: 1,
+      pageSize: 20,
+      search: undefined,
+      speciesId: undefined,
+      status: undefined,
+    });
+
+    expect(
+      listed.items.some((animal) => animal.id === created.id),
+    ).toBe(false);
+  });
+
+  it("rechaza una madre que no es hembra", async () => {
+    const mother = await createAnimal(
+      {
+        code: `MADRE-${randomUUID()}`,
+        name: null,
+        speciesId: requiredSpeciesId(),
+        breedId: null,
+        sex: "MALE",
+        birthDate: null,
+        weightKg: null,
+        motherId: null,
+        fatherId: null,
+        status: "ALIVE",
+      },
+      requiredAdminId(),
+    );
+
+    const child = await createAnimal(
+      {
+        code: `CRIA-${randomUUID()}`,
+        name: null,
+        speciesId: requiredSpeciesId(),
+        breedId: null,
+        sex: "FEMALE",
+        birthDate: null,
+        weightKg: null,
+        motherId: null,
+        fatherId: null,
+        status: "ALIVE",
+      },
+      requiredAdminId(),
+    );
+
+    await expect(
+      updateAnimal(
+        child.id,
+        {
+          motherId: mother.id,
+        },
+        requiredAdminId(),
+      ),
+    ).rejects.toMatchObject({
+      name: "AnimalRelationshipError",
+    });
   });
 });

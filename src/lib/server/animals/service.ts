@@ -5,10 +5,12 @@ import {
   AnimalConflictError,
   AnimalNotFoundError,
   AnimalValidationError,
+  AnimalRelationshipError,
 } from "./errors";
 import {
   CreateAnimalInput,
   ListAnimalsQuery,
+  UpdateAnimalInput,
 } from "./validation";
 
 export type AnimalListItem = {
@@ -253,4 +255,160 @@ export async function getAnimalById(
   }
 
   return toAnimalListItem(animal);
+}
+
+export async function updateAnimal(
+  id: string,
+  input: UpdateAnimalInput,
+  updatedById: string,
+): Promise<AnimalListItem> {
+  const existing = await db.animal.findFirst({
+    where: {
+      id,
+    },
+    select: {
+      id: true,
+      code: true,
+      speciesId: true,
+      isActive: true,
+    },
+  });
+
+  if (!existing) {
+    throw new AnimalNotFoundError();
+  }
+
+  if (input.breedId !== undefined) {
+    if (input.breedId === null) {
+      // La raza puede eliminarse.
+    } else {
+      const breed = await db.breed.findFirst({
+        where: {
+          id: input.breedId,
+          speciesId: existing.speciesId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!breed) {
+        throw new AnimalValidationError({
+          breedId: [
+            "La raza seleccionada no existe, no esta activa o no pertenece a la especie del animal.",
+          ],
+        });
+      }
+    }
+  }
+
+  const parentIds = [
+    input.motherId,
+    input.fatherId,
+  ].filter((value): value is string => value !== undefined && value !== null);
+
+  if (parentIds.includes(id)) {
+    throw new AnimalRelationshipError(
+      "Un animal no puede ser su propio progenitor.",
+    );
+  }
+
+  if (input.motherId !== undefined && input.motherId !== null) {
+    const mother = await db.animal.findFirst({
+      where: {
+        id: input.motherId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        sex: true,
+      },
+    });
+
+    if (!mother) {
+      throw new AnimalRelationshipError(
+        "La madre seleccionada no existe o no esta activa.",
+      );
+    }
+
+    if (mother.sex !== "FEMALE") {
+      throw new AnimalRelationshipError(
+        "La madre seleccionada debe ser hembra.",
+      );
+    }
+  }
+
+  if (input.fatherId !== undefined && input.fatherId !== null) {
+    const father = await db.animal.findFirst({
+      where: {
+        id: input.fatherId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        sex: true,
+      },
+    });
+
+    if (!father) {
+      throw new AnimalRelationshipError(
+        "El padre seleccionado no existe o no esta activo.",
+      );
+    }
+
+    if (father.sex !== "MALE") {
+      throw new AnimalRelationshipError(
+        "El padre seleccionado debe ser macho.",
+      );
+    }
+  }
+
+  try {
+    const animal = await db.animal.update({
+      where: {
+        id,
+      },
+      data: {
+        name: input.name,
+        breedId: input.breedId,
+        sex: input.sex,
+        birthDate: input.birthDate,
+        weightKg:
+          input.weightKg === undefined
+            ? undefined
+            : input.weightKg === null
+              ? null
+              : new Prisma.Decimal(input.weightKg),
+        motherId: input.motherId,
+        fatherId: input.fatherId,
+        status: input.status,
+        isActive: input.isActive,
+        updatedById,
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        sex: true,
+        status: true,
+        birthDate: true,
+        weightKg: true,
+        speciesId: true,
+        breedId: true,
+        isActive: true,
+      },
+    });
+
+    return toAnimalListItem(animal);
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      throw new AnimalNotFoundError();
+    }
+
+    throw error;
+  }
 }

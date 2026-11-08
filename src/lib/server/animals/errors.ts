@@ -24,3 +24,11 @@ export class AnimalNotFoundError extends Error {
     this.name = "AnimalNotFoundError";
   }
 }
+
+export class AnimalRelationshipError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    this.name = "AnimalRelationshipError";
+  }
+}
