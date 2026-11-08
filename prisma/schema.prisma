@@ -13,7 +13,8 @@ model Farm {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  animals Animal[]
+  animals  Animal[]
+  pastures Pasture[]
 
   @@map("farm")
 }
@@ -49,6 +50,9 @@ model User {
   updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   sessions Session[]
+
+  pasturesCreated Pasture[] @relation("PasturesCreated")
+  pasturesUpdated Pasture[] @relation("PasturesUpdated")
 
   animalsCreated Animal[]          @relation("AnimalsCreated")
   animalsUpdated Animal[]          @relation("AnimalsUpdated")
@@ -158,6 +162,9 @@ model Animal {
   createdBy User  @relation("AnimalsCreated", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
   updatedBy User? @relation("AnimalsUpdated", fields: [updatedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
+  currentPastureId String?  @map("current_pasture_id") @db.Uuid
+  currentPasture   Pasture? @relation(fields: [currentPastureId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
   changeLogs AnimalChangeLog[]
 
   @@index([farmId, status])
@@ -191,4 +198,29 @@ model AnimalChangeLog {
   @@index([animalId, createdAt])
   @@index([changedById])
   @@map("animal_change_log")
+}
+
+model Pasture {
+  id           String   @id @default(uuid()) @db.Uuid
+  farmId       Int      @map("farm_id")
+  name         String   @db.VarChar(150)
+  description  String?  @db.VarChar(500)
+  areaHectares Decimal? @map("area_hectares") @db.Decimal(12, 4)
+  isActive     Boolean  @default(true) @map("is_active")
+
+  createdById String  @map("created_by_id") @db.Uuid
+  updatedById String? @map("updated_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  farm      Farm  @relation(fields: [farmId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy User  @relation("PasturesCreated", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  updatedBy User? @relation("PasturesUpdated", fields: [updatedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  animals Animal[]
+
+  @@unique([farmId, name])
+  @@index([farmId, isActive])
+  @@map("pasture")
 }
