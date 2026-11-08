@@ -156,3 +156,13 @@ export type UpdateAnimalInput = {
     | "TRANSFERRED";
   isActive?: boolean;
 };
+
+export const updateAnimalPastureSchema = z
+  .object({
+    currentPastureId: z.string().uuid().nullable(),
+  })
+  .strict();
+
+export type UpdateAnimalPastureInput = z.infer<
+  typeof updateAnimalPastureSchema
+>;

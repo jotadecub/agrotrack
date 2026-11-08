@@ -179,6 +179,7 @@ enum AnimalChangeAction {
   CREATED
   UPDATED
   DEACTIVATED
+  PASTURE_CHANGED
 
   @@map("animal_change_action")
 }

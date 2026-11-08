@@ -11,7 +11,12 @@ import {
   CreateAnimalInput,
   ListAnimalsQuery,
   UpdateAnimalInput,
+  UpdateAnimalPastureInput,
 } from "./validation";
+
+import {
+  PastureNotFoundError,
+} from "../pastures/errors";
 
 export type AnimalListItem = {
   id: string;
@@ -35,11 +40,11 @@ type AnimalChangeData = {
   motherId?: string | null;
   fatherId?: string | null;
   status?:
-    | "ALIVE"
-    | "DEAD"
-    | "SOLD"
-    | "SICK"
-    | "TRANSFERRED";
+  | "ALIVE"
+  | "DEAD"
+  | "SOLD"
+  | "SICK"
+  | "TRANSFERRED";
   isActive?: boolean;
 };
 
@@ -126,7 +131,7 @@ export async function createAnimal(
     }
   }
 
-    try {
+  try {
     const animal = await db.$transaction(async (tx) => {
       const created = await tx.animal.create({
         data: {
@@ -414,7 +419,7 @@ export async function updateAnimal(
     }
   }
 
-    try {
+  try {
     const animal = await db.$transaction(async (tx) => {
       const current = await tx.animal.findUniqueOrThrow({
         where: {
@@ -527,4 +532,107 @@ export async function updateAnimal(
 
     throw error;
   }
+}
+
+export async function updateAnimalPasture(
+  animalId: string,
+  input: UpdateAnimalPastureInput,
+  updatedById: string,
+): Promise<AnimalListItem> {
+  return db.$transaction(
+    async (tx) => {
+      const animal = await tx.animal.findFirst({
+        where: {
+          id: animalId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          sex: true,
+          status: true,
+          birthDate: true,
+          weightKg: true,
+          speciesId: true,
+          breedId: true,
+          motherId: true,
+          fatherId: true,
+          currentPastureId: true,
+          isActive: true,
+        },
+      });
+
+      if (!animal) {
+        throw new AnimalNotFoundError();
+      }
+
+      const previousPastureId = animal.currentPastureId;
+      const nextPastureId = input.currentPastureId;
+
+      if (previousPastureId === nextPastureId) {
+        return toAnimalListItem(animal);
+      }
+
+      if (nextPastureId) {
+        const pasture = await tx.pasture.findFirst({
+          where: {
+            id: nextPastureId,
+            isActive: true,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (!pasture) {
+          throw new PastureNotFoundError();
+        }
+      }
+
+      const updatedAnimal = await tx.animal.update({
+        where: {
+          id: animalId,
+        },
+        data: {
+          currentPastureId: nextPastureId,
+          updatedById,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          sex: true,
+          status: true,
+          birthDate: true,
+          weightKg: true,
+          speciesId: true,
+          breedId: true,
+          motherId: true,
+          fatherId: true,
+          currentPastureId: true,
+          isActive: true,
+        },
+      });
+
+      await tx.animalChangeLog.create({
+        data: {
+          animalId,
+          action: "PASTURE_CHANGED",
+          changedById: updatedById,
+          previousData: {
+            currentPastureId: previousPastureId,
+          },
+          newData: {
+            currentPastureId: nextPastureId,
+          },
+        },
+      });
+
+      return toAnimalListItem(updatedAnimal);
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
 }
