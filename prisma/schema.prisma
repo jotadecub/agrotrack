@@ -39,9 +39,10 @@ model User {
   phone              String?    @db.VarChar(30)
   address            String?    @db.VarChar(250)
   passwordHash       String     @map("password_hash") @db.Text
+  mustChangePassword Boolean    @default(true) @map("must_change_password")
+  passwordChangedAt  DateTime?
   role               UserRole   @default(READER)
   status             UserStatus @default(ACTIVE)
-  mustChangePassword Boolean    @default(true) @map("must_change_password")
   createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 

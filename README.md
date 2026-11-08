@@ -272,3 +272,95 @@ inactividad, vencimiento absoluto, rotacion, un escenario de
 concurrencia y rollback ante fallos de firma.
 
 No prueban todavia cookies, endpoints, CSRF ni navegadores.
+
+### Autenticacion web: primer bloque
+
+Se agrego la capa inicial de cookies y proteccion de origen.
+
+- Cookies HttpOnly y SameSite=Strict.
+- Secure automatico en produccion.
+- Verificacion de Origin en peticiones de escritura.
+- Endpoint inicial de login.
+- Limite local de cinco intentos por IP en 15 minutos.
+
+El limite de intentos todavia esta en memoria y se reinicia
+al reiniciar el servidor. Debe moverse a almacenamiento
+persistente antes de produccion.
+
+Las cookies no sustituyen la autorizacion por rol.
+
+### Cambio obligatorio de contrasena
+
+Se agrego `passwordChangedAt` como campo opcional.
+
+Los usuarios nuevos tienen este valor nulo. El login devuelve
+`mustChangePassword`, pero no expone `passwordChangedAt`.
+
+El siguiente paso restringira las operaciones mientras el cambio
+de contrasena este pendiente.
+
+### Cambio obligatorio de contrasena
+
+Se agrego el cambio de contrasena para usuarios con
+`mustChangePassword = true`.
+
+El servicio verifica la contrasena actual, aplica la politica
+de contrasenas y actualiza el hash dentro de una transaccion.
+
+Al cambiarla:
+
+- Se marca el cambio como completado.
+- Se registra `passwordChangedAt`.
+- Se revocan todas las sesiones activas anteriores.
+- Se crea una nueva sesion.
+
+El endpoint requiere una sesion valida y verifica el origen.
+No permite cambiar la contrasena de un usuario inactivo.
+
+### Cierre de sesion
+
+Se agrego el cierre de sesion por sesion individual.
+
+El endpoint revoca la sesion identificada por el JWT de acceso,
+elimina las cookies y responde de forma uniforme.
+
+No revoca otras sesiones del mismo usuario. Esa accion requerira
+una operacion explicita y autorizada en el futuro.
+
+### Renovacion coordinada
+
+Se agrego el endpoint `/api/auth/refresh` y una utilidad cliente
+para reintentar peticiones despues de renovar la sesion.
+
+El endpoint lee el `sessionId` del JWT de acceso y valida la
+credencial de renovacion contra PostgreSQL. La credencial anterior
+deja de ser valida tras una renovacion exitosa.
+
+El cliente realiza una sola renovacion para peticiones concurrentes
+y reintenta la peticion original una vez.
+
+La credencial de renovacion permanece en una cookie HttpOnly.
+No se almacena en localStorage ni sessionStorage.
+
+### Autorizacion por rol
+
+Se agrego una capa de autorizacion en el servidor.
+
+- Administrador: control total.
+- Supervisor: operaciones operativas y consulta.
+- Lector: consulta unicamente.
+
+Las funciones de autorizacion se usaran en los endpoints.
+La interfaz podra ocultar acciones, pero la decision final
+siempre correspondera al servidor.
+
+### Sesion actual
+
+Se agrego `/api/auth/me`.
+
+El endpoint valida la sesion, registra actividad y devuelve
+unicamente los datos necesarios para la interfaz.
+
+No expone el hash de contrasena, correo, telefono ni direccion.
+La autorizacion por rol seguira aplicandose en los endpoints
+operativos.

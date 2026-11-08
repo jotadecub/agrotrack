@@ -15,6 +15,7 @@ export type AuthenticatedSession = {
     fullName: string;
     role: UserRole;
     mustChangePassword: boolean;
+    passwordChangedAt: Date | null;
   };
 };
 
@@ -58,6 +59,7 @@ export async function validateAccessToken(
           role: true,
           status: true,
           mustChangePassword: true,
+          passwordChangedAt: true,
         },
       },
     },
@@ -120,6 +122,7 @@ export async function validateAccessToken(
       fullName: session.user.fullName,
       role: session.user.role,
       mustChangePassword: session.user.mustChangePassword,
+      passwordChangedAt: session.user.passwordChangedAt,
     },
   };
 }

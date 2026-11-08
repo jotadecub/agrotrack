@@ -135,6 +135,7 @@ describe("sesiones con PostgreSQL real", () => {
       fullName: "Usuario de integración",
       role: "ADMIN",
       mustChangePassword: true,
+      passwordChangedAt: null,
     });
 
     const stored = await db.session.findUniqueOrThrow({
