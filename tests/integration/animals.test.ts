@@ -15,7 +15,6 @@ vi.mock("server-only", () => ({}));
 
 import { db } from "../../src/lib/server/db";
 import { hashPassword } from "../../src/lib/server/auth/password";
-import { createSession } from "../../src/lib/server/auth/session-service";
 import {
   createAnimal,
   listAnimals,
