@@ -97,6 +97,7 @@ export const listAnimalsQuerySchema = z
       .transform((value) => (value === 0 || value === undefined ? undefined : value)),
     status: z.enum(animalStatusValues).nullish()
       .transform((value) => (value === undefined ? undefined : value)),
+    pastureId: z.string().uuid().nullish(),
   })
   .strict();
 

@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
       search: searchParams.get("search") ?? undefined,
       speciesId: searchParams.get("speciesId") ?? undefined,
       status: searchParams.get("status") ?? undefined,
+      pastureId: searchParams.get("pastureId") ?? undefined,
     });
 
     const result = await listAnimals(query);

@@ -29,6 +29,7 @@ export type AnimalListItem = {
   speciesId: number;
   breedId: number | null;
   isActive: boolean;
+  currentPastureId: string | null;
 };
 
 type AnimalChangeData = {
@@ -62,6 +63,7 @@ function toAnimalListItem(
     isActive: boolean;
     motherId: string | null;
     fatherId: string | null;
+    currentPastureId: string | null;
   },
 ): AnimalListItem {
   return {
@@ -75,6 +77,7 @@ function toAnimalListItem(
     speciesId: animal.speciesId,
     breedId: animal.breedId,
     isActive: animal.isActive,
+    currentPastureId: animal.currentPastureId,
   };
 }
 
@@ -164,6 +167,7 @@ export async function createAnimal(
           isActive: true,
           motherId: true,
           fatherId: true,
+          currentPastureId: true,
         },
       });
 
@@ -186,6 +190,7 @@ export async function createAnimal(
             fatherId: created.fatherId,
             status: created.status,
             isActive: created.isActive,
+            currentPastureId: created.currentPastureId,
           },
         },
       });
@@ -224,6 +229,10 @@ export async function listAnimals(
 
   if (query.status) {
     where.status = query.status;
+  }
+
+  if (query.pastureId) {
+    where.currentPastureId = query.pastureId;
   }
 
   if (query.search) {
@@ -266,6 +275,7 @@ export async function listAnimals(
         isActive: true,
         motherId: true,
         fatherId: true,
+        currentPastureId: true,
       },
     }),
     db.animal.count({
@@ -302,6 +312,7 @@ export async function getAnimalById(
       isActive: true,
       motherId: true,
       fatherId: true,
+      currentPastureId: true,
     },
   });
 
@@ -435,6 +446,7 @@ export async function updateAnimal(
           fatherId: true,
           status: true,
           isActive: true,
+          currentPastureId: true,
         },
       });
 
@@ -487,6 +499,7 @@ export async function updateAnimal(
           isActive: true,
           motherId: true,
           fatherId: true,
+          currentPastureId: true,
         },
       });
 
