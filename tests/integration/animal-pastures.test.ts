@@ -363,4 +363,31 @@ describe("asignacion de animales a terrenos", () => {
             currentPastureId: secondPastureId,
         });
     });
+
+    it("rechaza un terreno inactivo", async () => {
+        const animalId = await createTestAnimal();
+
+        const pasture = await createTestPasture();
+
+        await db.pasture.update({
+            where: {
+                id: pasture,
+            },
+            data: {
+                isActive: false,
+            },
+        });
+
+        await expect(
+            updateAnimalPasture(
+                animalId,
+                {
+                    currentPastureId: pasture,
+                },
+                requiredAdminId(),
+            ),
+        ).rejects.toMatchObject({
+            name: "PastureNotFoundError",
+        });
+    });
 });
