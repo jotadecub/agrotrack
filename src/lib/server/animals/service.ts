@@ -16,6 +16,7 @@ import {
 
 import {
   PastureNotFoundError,
+  PastureValidationError,
 } from "../pastures/errors";
 
 export type AnimalListItem = {
@@ -573,6 +574,7 @@ export async function updateAnimalPasture(
           fatherId: true,
           currentPastureId: true,
           isActive: true,
+          farmId: true,
         },
       });
 
@@ -595,11 +597,20 @@ export async function updateAnimalPasture(
           },
           select: {
             id: true,
+            farmId: true,
           },
         });
 
         if (!pasture) {
           throw new PastureNotFoundError();
+        }
+
+        if (pasture.farmId !== animal.farmId) {
+          throw new PastureValidationError({
+            currentPastureId: [
+              "El terreno seleccionado no pertenece a la finca del animal.",
+            ],
+          });
         }
       }
 
