@@ -224,6 +224,20 @@ describe("GET /api/pastures/[id]/animals", () => {
         return origin;
     }
 
+    const rejectedOriginCases: Array<{
+        label: string;
+        origin: string | null;
+    }> = [
+            {
+                label: "sin encabezado Origin",
+                origin: null,
+            },
+            {
+                label: "con un origen no autorizado",
+                origin: "https://origen-no-autorizado.invalid",
+            },
+        ];
+
     async function createAnimalFixture(
         assignedPastureId: string,
         isActive = true,
@@ -753,6 +767,130 @@ describe("GET /api/pastures/[id]/animals", () => {
             expect(stored.areaHectares?.toString()).toBe("8.25");
             expect(stored.isActive).toBe(true);
             expect(stored.updatedById).toBe(requiredUserId());
+        },
+    );
+
+    it.each(rejectedOriginCases)(
+        "rechaza crear terrenos $label y no guarda el registro",
+        async ({ origin }) => {
+            await authenticateWithRole("ADMIN");
+
+            const allowedOrigin = requiredAllowedOrigin();
+            const name = `Terreno con origen rechazado-${randomUUID()}`;
+
+            const beforeCount = await db.pasture.count();
+
+            const headers = new Headers({
+                "Content-Type": "application/json",
+            });
+
+            if (origin !== null) {
+                headers.set("Origin", origin);
+            }
+
+            const request = new NextRequest(
+                new URL("/api/pastures", allowedOrigin),
+                {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({
+                        name,
+                        description: "Este terreno no debe crearse.",
+                        areaHectares: 5,
+                    }),
+                },
+            );
+
+            const response = await createPastureRoute(request);
+
+            expect(response.status).toBe(403);
+
+            expect(await response.json()).toEqual({
+                error: "Origen no autorizado para esta operación.",
+            });
+
+            const storedCount = await db.pasture.count({
+                where: {
+                    name,
+                },
+            });
+
+            expect(storedCount).toBe(0);
+
+            const afterCount = await db.pasture.count();
+
+            expect(afterCount).toBe(beforeCount);
+        },
+    );
+
+    it.each(rejectedOriginCases)(
+        "rechaza modificar terrenos $label y conserva los datos",
+        async ({ origin }) => {
+            const id = requiredPastureId();
+
+            await authenticateWithRole("ADMIN");
+
+            const before = await db.pasture.findUniqueOrThrow({
+                where: {
+                    id,
+                },
+            });
+
+            const allowedOrigin = requiredAllowedOrigin();
+
+            const headers = new Headers({
+                "Content-Type": "application/json",
+            });
+
+            if (origin !== null) {
+                headers.set("Origin", origin);
+            }
+
+            const request = new NextRequest(
+                new URL(`/api/pastures/${id}`, allowedOrigin),
+                {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({
+                        name: `Cambio con origen rechazado-${randomUUID()}`,
+                        description: "Esta modificación no debe guardarse.",
+                        areaHectares: 99,
+                        isActive: false,
+                    }),
+                },
+            );
+
+            const response = await updatePastureRoute(request, {
+                params: Promise.resolve({ id }),
+            });
+
+            expect(response.status).toBe(403);
+
+            expect(await response.json()).toEqual({
+                error: "Origen no autorizado para esta operación.",
+            });
+
+            const after = await db.pasture.findUniqueOrThrow({
+                where: {
+                    id,
+                },
+            });
+
+            expect({
+                name: after.name,
+                description: after.description,
+                areaHectares: after.areaHectares?.toString() ?? null,
+                isActive: after.isActive,
+                updatedById: after.updatedById,
+                updatedAt: after.updatedAt,
+            }).toEqual({
+                name: before.name,
+                description: before.description,
+                areaHectares: before.areaHectares?.toString() ?? null,
+                isActive: before.isActive,
+                updatedById: before.updatedById,
+                updatedAt: before.updatedAt,
+            });
         },
     );
 });
