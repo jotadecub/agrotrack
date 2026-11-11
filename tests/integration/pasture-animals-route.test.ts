@@ -209,6 +209,21 @@ describe("GET /api/pastures/[id]/animals", () => {
         return pastureId;
     }
 
+    function requiredAllowedOrigin(): string {
+        const origin = process.env.AUTH_ALLOWED_ORIGINS
+            ?.split(",")
+            .map((value) => value.trim())
+            .find((value) => value.length > 0);
+
+        if (!origin) {
+            throw new Error(
+                "AUTH_ALLOWED_ORIGINS debe contener al menos un origen para las pruebas de escritura de terrenos.",
+            );
+        }
+
+        return origin;
+    }
+
     async function createAnimalFixture(
         assignedPastureId: string,
         isActive = true,
@@ -530,7 +545,7 @@ describe("GET /api/pastures/[id]/animals", () => {
         await authenticateReader();
 
         const name = `Terreno no autorizado-${randomUUID()}`;
-        const origin = process.env.APP_ORIGIN ?? "http://localhost";
+        const origin = requiredAllowedOrigin();
 
         const request = new NextRequest(
             new URL("/api/pastures", origin),
@@ -538,9 +553,7 @@ describe("GET /api/pastures/[id]/animals", () => {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(process.env.APP_ORIGIN
-                        ? { Origin: process.env.APP_ORIGIN }
-                        : {}),
+                    Origin: origin,
                 },
                 body: JSON.stringify({
                     name,
@@ -578,7 +591,7 @@ describe("GET /api/pastures/[id]/animals", () => {
 
         await authenticateReader();
 
-        const origin = process.env.APP_ORIGIN ?? "http://localhost";
+        const origin = requiredAllowedOrigin();
 
         const request = new NextRequest(
             new URL(`/api/pastures/${id}`, origin),
@@ -586,9 +599,7 @@ describe("GET /api/pastures/[id]/animals", () => {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(process.env.APP_ORIGIN
-                        ? { Origin: process.env.APP_ORIGIN }
-                        : {}),
+                    Origin: origin,
                 },
                 body: JSON.stringify({
                     name: `Cambio no autorizado-${randomUUID()}`,
@@ -638,7 +649,7 @@ describe("GET /api/pastures/[id]/animals", () => {
             await authenticateWithRole(role);
 
             const name = `Terreno autorizado-${randomUUID()}`;
-            const origin = process.env.APP_ORIGIN ?? "http://localhost";
+            const origin = requiredAllowedOrigin();
 
             const request = new NextRequest(
                 new URL("/api/pastures", origin),
@@ -646,9 +657,7 @@ describe("GET /api/pastures/[id]/animals", () => {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        ...(process.env.APP_ORIGIN
-                            ? { Origin: process.env.APP_ORIGIN }
-                            : {}),
+                        Origin: origin,
                     },
                     body: JSON.stringify({
                         name,
@@ -697,7 +706,7 @@ describe("GET /api/pastures/[id]/animals", () => {
             await authenticateWithRole(role);
 
             const name = `Terreno actualizado-${randomUUID()}`;
-            const origin = process.env.APP_ORIGIN ?? "http://localhost";
+            const origin = requiredAllowedOrigin();
 
             const request = new NextRequest(
                 new URL(`/api/pastures/${id}`, origin),
@@ -705,9 +714,7 @@ describe("GET /api/pastures/[id]/animals", () => {
                     method: "PATCH",
                     headers: {
                         "Content-Type": "application/json",
-                        ...(process.env.APP_ORIGIN
-                            ? { Origin: process.env.APP_ORIGIN }
-                            : {}),
+                        Origin: origin,
                     },
                     body: JSON.stringify({
                         name,

@@ -18,6 +18,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: loadTestDatabaseUrl(),
       AUTH_JWT_SECRET: randomBytes(32).toString("hex"),
+      AUTH_ALLOWED_ORIGINS: "http://localhost:3000",
     },
   },
 });

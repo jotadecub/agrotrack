@@ -20,6 +20,10 @@ import {
   createPastureSchema,
   listPasturesQuerySchema,
 } from "@/lib/server/pastures/validation";
+import {
+  assertSameOrigin,
+  OriginNotAllowedError,
+} from "@/lib/server/auth/request-origin";
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "agrotrack_session";
 
@@ -97,22 +101,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const origin = request.headers.get("origin");
-
-    if (origin) {
-      const allowedOrigin = process.env.APP_ORIGIN;
-
-      if (!allowedOrigin || origin !== allowedOrigin) {
-        return NextResponse.json(
-          {
-            error: "Origen no permitido.",
-          },
-          {
-            status: 403,
-          },
-        );
-      }
-    }
+    assertSameOrigin(request);
 
     const cookieStore = await cookies();
 
@@ -164,6 +153,28 @@ export async function POST(request: NextRequest) {
       },
     );
   } catch (error) {
+    if (error instanceof OriginNotAllowedError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json(
+        {
+          error: "No tienes permiso para crear terrenos.",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
     if (error instanceof ForbiddenError) {
       return NextResponse.json(
         {
