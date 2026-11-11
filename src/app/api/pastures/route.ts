@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import {
   assertCanManageOperationalData,
   assertCanReadData,
+  ForbiddenError,
 } from "@/lib/server/auth/authorization";
 import { validateAccessToken } from "@/lib/server/auth/validate-session";
 import {
@@ -163,6 +164,17 @@ export async function POST(request: NextRequest) {
       },
     );
   } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json(
+        {
+          error: "No tienes permiso para crear terrenos.",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
     if (error instanceof ZodError) {
       return NextResponse.json(
         {
