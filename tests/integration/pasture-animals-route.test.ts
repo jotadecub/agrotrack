@@ -262,16 +262,24 @@ describe("GET /api/pastures/[id]/animals", () => {
         cookieState.accessToken = session.accessToken;
     }
 
-    async function requestPastureAnimals(id: string) {
-        const request = new NextRequest(
+    async function requestPastureAnimals(
+        id: string,
+        query: Record<string, string> = {},
+    ) {
+        const url = new URL(
             `http://localhost/api/pastures/${id}/animals`,
         );
+
+        for (const [key, value] of Object.entries(query)) {
+            url.searchParams.set(key, value);
+        }
+
+        const request = new NextRequest(url);
 
         return GET(request, {
             params: Promise.resolve({ id }),
         });
     }
-
     it("rechaza una solicitud sin sesión", async () => {
         const response = await requestPastureAnimals(
             requiredPastureId(),
@@ -384,6 +392,116 @@ describe("GET /api/pastures/[id]/animals", () => {
             id: activeAnimalId,
             currentPastureId,
             isActive: true,
+        });
+    });
+
+    it("pagina los animales sin repetirlos y conserva el total", async () => {
+        const currentPastureId = requiredPastureId();
+
+        const firstAnimalId = await createAnimalFixture(
+            currentPastureId,
+        );
+
+        const secondAnimalId = await createAnimalFixture(
+            currentPastureId,
+        );
+
+        const thirdAnimalId = await createAnimalFixture(
+            currentPastureId,
+        );
+
+        await authenticateReader();
+
+        const firstResponse = await requestPastureAnimals(
+            currentPastureId,
+            {
+                page: "1",
+                pageSize: "2",
+            },
+        );
+
+        const secondResponse = await requestPastureAnimals(
+            currentPastureId,
+            {
+                page: "2",
+                pageSize: "2",
+            },
+        );
+
+        expect(firstResponse.status).toBe(200);
+        expect(secondResponse.status).toBe(200);
+
+        const firstPage = await firstResponse.json();
+        const secondPage = await secondResponse.json();
+
+        expect(firstPage).toMatchObject({
+            page: 1,
+            pageSize: 2,
+            total: 3,
+        });
+
+        expect(secondPage).toMatchObject({
+            page: 2,
+            pageSize: 2,
+            total: 3,
+        });
+
+        expect(firstPage.items).toHaveLength(2);
+        expect(secondPage.items).toHaveLength(1);
+
+        const returnedIds = [
+            ...firstPage.items.map((animal: { id: string }) => animal.id),
+            ...secondPage.items.map((animal: { id: string }) => animal.id),
+        ];
+
+        expect(new Set(returnedIds).size).toBe(3);
+
+        expect([...returnedIds].sort()).toEqual(
+            [
+                firstAnimalId,
+                secondAnimalId,
+                thirdAnimalId,
+            ].sort(),
+        );
+    });
+
+    it("no permite reemplazar el terreno de la ruta mediante pastureId", async () => {
+        const requestedPastureId = requiredPastureId();
+
+        const otherPasture = await createPasture(
+            {
+                name: `Potrero consulta-${randomUUID()}`,
+                description: null,
+                areaHectares: 5,
+            },
+            requiredUserId(),
+        );
+
+        const expectedAnimalId = await createAnimalFixture(
+            requestedPastureId,
+        );
+
+        await createAnimalFixture(otherPasture.id);
+
+        await authenticateReader();
+
+        const response = await requestPastureAnimals(
+            requestedPastureId,
+            {
+                pastureId: otherPasture.id,
+            },
+        );
+
+        expect(response.status).toBe(200);
+
+        const body = await response.json();
+
+        expect(body.total).toBe(1);
+        expect(body.items).toHaveLength(1);
+
+        expect(body.items[0]).toMatchObject({
+            id: expectedAnimalId,
+            currentPastureId: requestedPastureId,
         });
     });
 });

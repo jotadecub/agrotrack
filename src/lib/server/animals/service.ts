@@ -260,6 +260,9 @@ export async function listAnimals(
         {
           createdAt: "desc",
         },
+        {
+          id: "desc",
+        },
       ],
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
