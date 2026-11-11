@@ -264,6 +264,25 @@ describe("GET /api/pastures/[id]/animals", () => {
         cookieState.accessToken = session.accessToken;
     }
 
+    async function authenticateWithRole(
+        role: "ADMIN" | "SUPERVISOR",
+    ): Promise<void> {
+        const id = requiredUserId();
+
+        await db.user.update({
+            where: {
+                id,
+            },
+            data: {
+                role,
+            },
+        });
+
+        const session = await createSession(id);
+
+        cookieState.accessToken = session.accessToken;
+    }
+
     async function requestPastureAnimals(
         id: string,
         query: Record<string, string> = {},
@@ -612,4 +631,121 @@ describe("GET /api/pastures/[id]/animals", () => {
             updatedAt: before.updatedAt,
         });
     });
+
+    it.each(["ADMIN", "SUPERVISOR"] as const)(
+        "permite que %s cree un terreno",
+        async (role) => {
+            await authenticateWithRole(role);
+
+            const name = `Terreno autorizado-${randomUUID()}`;
+            const origin = process.env.APP_ORIGIN ?? "http://localhost";
+
+            const request = new NextRequest(
+                new URL("/api/pastures", origin),
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(process.env.APP_ORIGIN
+                            ? { Origin: process.env.APP_ORIGIN }
+                            : {}),
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description: "Terreno creado desde el endpoint.",
+                        areaHectares: 7.5,
+                    }),
+                },
+            );
+
+            const response = await createPastureRoute(request);
+
+            expect(response.status).toBe(201);
+
+            const body = await response.json();
+
+            expect(body.pasture).toMatchObject({
+                name,
+                description: "Terreno creado desde el endpoint.",
+                areaHectares: "7.5",
+                isActive: true,
+            });
+
+            expect(body.pasture.id).toEqual(expect.any(String));
+
+            const stored = await db.pasture.findUniqueOrThrow({
+                where: {
+                    id: body.pasture.id,
+                },
+            });
+
+            expect(stored.name).toBe(name);
+            expect(stored.description).toBe(
+                "Terreno creado desde el endpoint.",
+            );
+            expect(stored.areaHectares?.toString()).toBe("7.5");
+            expect(stored.isActive).toBe(true);
+            expect(stored.createdById).toBe(requiredUserId());
+        },
+    );
+
+    it.each(["ADMIN", "SUPERVISOR"] as const)(
+        "permite que %s modifique un terreno",
+        async (role) => {
+            const id = requiredPastureId();
+
+            await authenticateWithRole(role);
+
+            const name = `Terreno actualizado-${randomUUID()}`;
+            const origin = process.env.APP_ORIGIN ?? "http://localhost";
+
+            const request = new NextRequest(
+                new URL(`/api/pastures/${id}`, origin),
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(process.env.APP_ORIGIN
+                            ? { Origin: process.env.APP_ORIGIN }
+                            : {}),
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description: "Terreno modificado desde el endpoint.",
+                        areaHectares: 8.25,
+                    }),
+                },
+            );
+
+            const response = await updatePastureRoute(request, {
+                params: Promise.resolve({ id }),
+            });
+
+            expect(response.status).toBe(200);
+
+            const body = await response.json();
+
+            expect(body.pasture).toMatchObject({
+                id,
+                name,
+                description: "Terreno modificado desde el endpoint.",
+                areaHectares: "8.25",
+                isActive: true,
+            });
+
+            const stored = await db.pasture.findUniqueOrThrow({
+                where: {
+                    id,
+                },
+            });
+
+            expect(stored.name).toBe(name);
+            expect(stored.description).toBe(
+                "Terreno modificado desde el endpoint.",
+            );
+            expect(stored.areaHectares?.toString()).toBe("8.25");
+            expect(stored.isActive).toBe(true);
+            expect(stored.updatedById).toBe(requiredUserId());
+        },
+    );
 });
