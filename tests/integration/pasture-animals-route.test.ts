@@ -40,6 +40,8 @@ vi.mock("next/headers", () => ({
 }));
 
 import { GET } from "../../src/app/api/pastures/[id]/animals/route";
+import { POST as createPastureRoute } from "../../src/app/api/pastures/route";
+import { PATCH as updatePastureRoute } from "../../src/app/api/pastures/[id]/route";
 import { db } from "../../src/lib/server/db";
 import { hashPassword } from "../../src/lib/server/auth/password";
 import { createSession } from "../../src/lib/server/auth/session-service";
@@ -502,6 +504,112 @@ describe("GET /api/pastures/[id]/animals", () => {
         expect(body.items[0]).toMatchObject({
             id: expectedAnimalId,
             currentPastureId: requestedPastureId,
+        });
+    });
+
+    it("impide que un lector cree terrenos y no guarda el registro", async () => {
+        await authenticateReader();
+
+        const name = `Terreno no autorizado-${randomUUID()}`;
+        const origin = process.env.APP_ORIGIN ?? "http://localhost";
+
+        const request = new NextRequest(
+            new URL("/api/pastures", origin),
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(process.env.APP_ORIGIN
+                        ? { Origin: process.env.APP_ORIGIN }
+                        : {}),
+                },
+                body: JSON.stringify({
+                    name,
+                    description: "Este terreno no debe crearse.",
+                    areaHectares: 5,
+                }),
+            },
+        );
+
+        const response = await createPastureRoute(request);
+
+        expect(response.status).toBe(403);
+
+        expect(await response.json()).toEqual({
+            error: "No tienes permiso para crear terrenos.",
+        });
+
+        const storedCount = await db.pasture.count({
+            where: {
+                name,
+            },
+        });
+
+        expect(storedCount).toBe(0);
+    });
+
+    it("impide que un lector modifique terrenos y conserva los datos", async () => {
+        const id = requiredPastureId();
+
+        const before = await db.pasture.findUniqueOrThrow({
+            where: {
+                id,
+            },
+        });
+
+        await authenticateReader();
+
+        const origin = process.env.APP_ORIGIN ?? "http://localhost";
+
+        const request = new NextRequest(
+            new URL(`/api/pastures/${id}`, origin),
+            {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(process.env.APP_ORIGIN
+                        ? { Origin: process.env.APP_ORIGIN }
+                        : {}),
+                },
+                body: JSON.stringify({
+                    name: `Cambio no autorizado-${randomUUID()}`,
+                    description: "Esta modificación no debe guardarse.",
+                    areaHectares: 99,
+                    isActive: false,
+                }),
+            },
+        );
+
+        const response = await updatePastureRoute(request, {
+            params: Promise.resolve({ id }),
+        });
+
+        expect(response.status).toBe(403);
+
+        expect(await response.json()).toEqual({
+            error: "No tienes permiso para modificar terrenos.",
+        });
+
+        const after = await db.pasture.findUniqueOrThrow({
+            where: {
+                id,
+            },
+        });
+
+        expect({
+            name: after.name,
+            description: after.description,
+            areaHectares: after.areaHectares?.toString() ?? null,
+            isActive: after.isActive,
+            updatedById: after.updatedById,
+            updatedAt: after.updatedAt,
+        }).toEqual({
+            name: before.name,
+            description: before.description,
+            areaHectares: before.areaHectares?.toString() ?? null,
+            isActive: before.isActive,
+            updatedById: before.updatedById,
+            updatedAt: before.updatedAt,
         });
     });
 });
