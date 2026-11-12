@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import {
   assertCanManageOperationalData,
+  ForbiddenError,
 } from "@/lib/server/auth/authorization";
 import { validateAccessToken } from "@/lib/server/auth/validate-session";
 import {
@@ -17,7 +18,12 @@ import {
 } from "@/lib/server/animals/validation";
 import {
   PastureNotFoundError,
+  PastureValidationError,
 } from "@/lib/server/pastures/errors";
+import {
+  assertSameOrigin,
+  OriginNotAllowedError,
+} from "@/lib/server/auth/request-origin";
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "agrotrack_session";
 
@@ -32,22 +38,7 @@ export async function PUT(
   context: RouteContext,
 ) {
   try {
-    const origin = request.headers.get("origin");
-
-    if (origin) {
-      const allowedOrigin = process.env.APP_ORIGIN;
-
-      if (!allowedOrigin || origin !== allowedOrigin) {
-        return NextResponse.json(
-          {
-            error: "Origen no permitido.",
-          },
-          {
-            status: 403,
-          },
-        );
-      }
-    }
+    assertSameOrigin(request);
 
     const { id } = await context.params;
 
@@ -102,6 +93,40 @@ export async function PUT(
       },
     );
   } catch (error) {
+    if (error instanceof OriginNotAllowedError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json(
+        {
+          error: "No tienes permiso para cambiar el terreno del animal.",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
+    if (error instanceof PastureValidationError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          details: error.details,
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
     if (error instanceof ZodError) {
       return NextResponse.json(
         {
