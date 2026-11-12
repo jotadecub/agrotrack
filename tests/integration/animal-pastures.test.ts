@@ -390,4 +390,115 @@ describe("asignacion de animales a terrenos", () => {
             name: "PastureNotFoundError",
         });
     });
+
+    it("rechaza asignar un terreno a un animal inactivo", async () => {
+        const animalId = await createTestAnimal();
+        const pastureId = await createTestPasture();
+
+        await db.animal.update({
+            where: {
+                id: animalId,
+            },
+            data: {
+                isActive: false,
+            },
+        });
+
+        const before = await db.animal.findUniqueOrThrow({
+            where: {
+                id: animalId,
+            },
+        });
+
+        const beforeLogCount = await db.animalChangeLog.count({
+            where: {
+                animalId,
+            },
+        });
+
+        await expect(
+            updateAnimalPasture(
+                animalId,
+                {
+                    currentPastureId: pastureId,
+                },
+                requiredAdminId(),
+            ),
+        ).rejects.toMatchObject({
+            name: "AnimalNotFoundError",
+        });
+
+        const after = await db.animal.findUniqueOrThrow({
+            where: {
+                id: animalId,
+            },
+        });
+
+        expect(after.currentPastureId).toBe(before.currentPastureId);
+        expect(after.isActive).toBe(false);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+
+        const afterLogCount = await db.animalChangeLog.count({
+            where: {
+                animalId,
+            },
+        });
+
+        expect(afterLogCount).toBe(beforeLogCount);
+    });
+
+    it("no modifica el animal ni duplica el historial al repetir el terreno actual", async () => {
+        const animalId = await createTestAnimal();
+        const pastureId = await createTestPasture();
+
+        await updateAnimalPasture(
+            animalId,
+            {
+                currentPastureId: pastureId,
+            },
+            requiredAdminId(),
+        );
+
+        const before = await db.animal.findUniqueOrThrow({
+            where: {
+                id: animalId,
+            },
+        });
+
+        const beforeLogCount = await db.animalChangeLog.count({
+            where: {
+                animalId,
+            },
+        });
+
+        const result = await updateAnimalPasture(
+            animalId,
+            {
+                currentPastureId: pastureId,
+            },
+            requiredAdminId(),
+        );
+
+        expect(result.id).toBe(animalId);
+        expect(result.currentPastureId).toBe(pastureId);
+
+        const after = await db.animal.findUniqueOrThrow({
+            where: {
+                id: animalId,
+            },
+        });
+
+        expect(after.currentPastureId).toBe(pastureId);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+
+        const afterLogCount = await db.animalChangeLog.count({
+            where: {
+                animalId,
+            },
+        });
+
+        expect(afterLogCount).toBe(beforeLogCount);
+    });
 });
