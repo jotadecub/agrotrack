@@ -150,11 +150,11 @@ export type UpdateAnimalInput = {
   motherId?: string | null;
   fatherId?: string | null;
   status?:
-    | "ALIVE"
-    | "DEAD"
-    | "SOLD"
-    | "SICK"
-    | "TRANSFERRED";
+  | "ALIVE"
+  | "DEAD"
+  | "SOLD"
+  | "SICK"
+  | "TRANSFERRED";
   isActive?: boolean;
 };
 
@@ -167,3 +167,9 @@ export const updateAnimalPastureSchema = z
 export type UpdateAnimalPastureInput = z.infer<
   typeof updateAnimalPastureSchema
 >;
+
+export const animalIdParamsSchema = z
+  .object({
+    id: z.string().uuid("El identificador del animal no es válido."),
+  })
+  .strict();

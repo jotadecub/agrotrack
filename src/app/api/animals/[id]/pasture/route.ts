@@ -15,6 +15,7 @@ import {
 } from "@/lib/server/animals/service";
 import {
   updateAnimalPastureSchema,
+  animalIdParamsSchema,
 } from "@/lib/server/animals/validation";
 import {
   PastureNotFoundError,
@@ -39,8 +40,6 @@ export async function PUT(
 ) {
   try {
     assertSameOrigin(request);
-
-    const { id } = await context.params;
 
     const cookieStore = await cookies();
 
@@ -73,6 +72,8 @@ export async function PUT(
     }
 
     assertCanManageOperationalData(authenticated.user.role);
+
+    const { id } = animalIdParamsSchema.parse(await context.params);
 
     const body = await request.json();
 

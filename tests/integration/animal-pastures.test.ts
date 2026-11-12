@@ -818,4 +818,159 @@ describe("asignacion de animales a terrenos", () => {
             expect(afterLogCount).toBe(beforeLogCount);
         },
     );
+
+    it("PUT rechaza un identificador de animal inválido sin modificar datos", async () => {
+        const pastureId = await createTestPasture();
+
+        await authenticateRouteUser("ADMIN");
+
+        const beforeAnimalCount = await db.animal.count({
+            where: {
+                createdById: requiredAdminId(),
+            },
+        });
+
+        const beforeLogCount = await db.animalChangeLog.count({
+            where: {
+                changedById: requiredAdminId(),
+            },
+        });
+
+        const response = await requestPastureAssignment(
+            "identificador-invalido",
+            pastureId,
+        );
+
+        expect(response.status).toBe(400);
+
+        expect(await response.json()).toMatchObject({
+            error: "Datos de asignacion invalidos.",
+            details: {
+                id: ["El identificador del animal no es válido."],
+            },
+        });
+
+        const afterAnimalCount = await db.animal.count({
+            where: {
+                createdById: requiredAdminId(),
+            },
+        });
+
+        const afterLogCount = await db.animalChangeLog.count({
+            where: {
+                changedById: requiredAdminId(),
+            },
+        });
+
+        expect(afterAnimalCount).toBe(beforeAnimalCount);
+        expect(afterLogCount).toBe(beforeLogCount);
+    });
+
+    it.each([
+        {
+            label: "sin currentPastureId",
+            body: {},
+        },
+        {
+            label: "con un UUID de terreno inválido",
+            body: {
+                currentPastureId: "terreno-invalido",
+            },
+        },
+        {
+            label: "con una cadena vacía como terreno",
+            body: {
+                currentPastureId: "",
+            },
+        },
+        {
+            label: "con campos adicionales",
+            body: {
+                currentPastureId: null,
+                isActive: false,
+            },
+        },
+    ])(
+        "PUT rechaza el cuerpo $label y conserva los datos",
+        async ({ body }) => {
+            const animalId = await createTestAnimal();
+            const pastureId = await createTestPasture();
+
+            await updateAnimalPasture(
+                animalId,
+                {
+                    currentPastureId: pastureId,
+                },
+                requiredAdminId(),
+            );
+
+            await authenticateRouteUser("ADMIN");
+
+            const before = await db.animal.findUniqueOrThrow({
+                where: {
+                    id: animalId,
+                },
+            });
+
+            const beforeLogCount = await db.animalChangeLog.count({
+                where: {
+                    animalId,
+                },
+            });
+
+            const origin = process.env.AUTH_ALLOWED_ORIGINS
+                ?.split(",")
+                .map((value) => value.trim())
+                .find((value) => value.length > 0);
+
+            if (!origin) {
+                throw new Error(
+                    "AUTH_ALLOWED_ORIGINS debe estar definido para probar el endpoint de asignación.",
+                );
+            }
+
+            const request = new NextRequest(
+                new URL(`/api/animals/${animalId}/pasture`, origin),
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Origin: origin,
+                    },
+                    body: JSON.stringify(body),
+                },
+            );
+
+            const response = await updateAnimalPastureRoute(request, {
+                params: Promise.resolve({
+                    id: animalId,
+                }),
+            });
+
+            expect(response.status).toBe(400);
+
+            expect(await response.json()).toMatchObject({
+                error: "Datos de asignacion invalidos.",
+            });
+
+            const after = await db.animal.findUniqueOrThrow({
+                where: {
+                    id: animalId,
+                },
+            });
+
+            expect(after.currentPastureId).toBe(pastureId);
+            expect(after.isActive).toBe(before.isActive);
+            expect(after.updatedById).toBe(before.updatedById);
+            expect(after.updatedAt).toEqual(before.updatedAt);
+
+            const afterLogCount = await db.animalChangeLog.count({
+                where: {
+                    animalId,
+                },
+            });
+
+            expect(afterLogCount).toBe(beforeLogCount);
+        },
+    );
 });
