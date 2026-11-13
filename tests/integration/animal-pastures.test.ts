@@ -1126,4 +1126,64 @@ describe("asignacion de animales a terrenos", () => {
             expect(afterLogCount).toBe(beforeLogCount);
         },
     );
+
+    it("PUT permite que un administrador desasigne el terreno y registra el cambio", async () => {
+        const animalId = await createTestAnimal();
+        const pastureId = await createTestPasture();
+
+        await updateAnimalPasture(
+            animalId,
+            {
+                currentPastureId: pastureId,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestPastureAssignment(
+            animalId,
+            null,
+        );
+
+        expect(response.status).toBe(200);
+
+        expect(await response.json()).toMatchObject({
+            animal: {
+                id: animalId,
+                currentPastureId: null,
+            },
+        });
+
+        const stored = await db.animal.findUniqueOrThrow({
+            where: {
+                id: animalId,
+            },
+        });
+
+        expect(stored.currentPastureId).toBeNull();
+        expect(stored.updatedById).toBe(requiredAdminId());
+
+        const logs = await db.animalChangeLog.findMany({
+            where: {
+                animalId,
+                action: "PASTURE_CHANGED",
+            },
+            orderBy: {
+                createdAt: "asc",
+            },
+        });
+
+        expect(logs).toHaveLength(2);
+
+        expect(logs[1]).toMatchObject({
+            changedById: requiredAdminId(),
+            previousData: {
+                currentPastureId: pastureId,
+            },
+            newData: {
+                currentPastureId: null,
+            },
+        });
+    });
 });
