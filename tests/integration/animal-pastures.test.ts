@@ -973,4 +973,157 @@ describe("asignacion de animales a terrenos", () => {
             expect(afterLogCount).toBe(beforeLogCount);
         },
     );
+
+    it.each([
+        {
+            label: "inexistente",
+            createInactivePasture: false,
+        },
+        {
+            label: "desactivado",
+            createInactivePasture: true,
+        },
+    ])(
+        "PUT rechaza un terreno $label y conserva la asignación",
+        async ({ createInactivePasture }) => {
+            const animalId = await createTestAnimal();
+            const currentPastureId = await createTestPasture();
+
+            await updateAnimalPasture(
+                animalId,
+                {
+                    currentPastureId,
+                },
+                requiredAdminId(),
+            );
+
+            let rejectedPastureId: string = randomUUID();
+
+            if (createInactivePasture) {
+                rejectedPastureId = await createTestPasture();
+
+                await db.pasture.update({
+                    where: {
+                        id: rejectedPastureId,
+                    },
+                    data: {
+                        isActive: false,
+                    },
+                });
+            }
+
+            await authenticateRouteUser("ADMIN");
+
+            const before = await db.animal.findUniqueOrThrow({
+                where: {
+                    id: animalId,
+                },
+            });
+
+            const beforeLogCount = await db.animalChangeLog.count({
+                where: {
+                    animalId,
+                },
+            });
+
+            const response = await requestPastureAssignment(
+                animalId,
+                rejectedPastureId,
+            );
+
+            expect(response.status).toBe(404);
+
+            expect(await response.json()).toEqual({
+                error: "El terreno solicitado no existe.",
+            });
+
+            const after = await db.animal.findUniqueOrThrow({
+                where: {
+                    id: animalId,
+                },
+            });
+
+            expect(after.currentPastureId).toBe(currentPastureId);
+            expect(after.updatedById).toBe(before.updatedById);
+            expect(after.updatedAt).toEqual(before.updatedAt);
+
+            const afterLogCount = await db.animalChangeLog.count({
+                where: {
+                    animalId,
+                },
+            });
+
+            expect(afterLogCount).toBe(beforeLogCount);
+        },
+    );
+
+    it.each([
+        {
+            label: "inexistente",
+            deactivateAnimal: false,
+        },
+        {
+            label: "desactivado",
+            deactivateAnimal: true,
+        },
+    ])(
+        "PUT rechaza un animal $label y conserva los datos",
+        async ({ deactivateAnimal }) => {
+            const pastureId = await createTestPasture();
+            let animalId: string = randomUUID();
+
+            if (deactivateAnimal) {
+                animalId = await createTestAnimal();
+
+                await db.animal.update({
+                    where: {
+                        id: animalId,
+                    },
+                    data: {
+                        isActive: false,
+                    },
+                });
+            }
+
+            await authenticateRouteUser("ADMIN");
+
+            const beforeAnimalCount = await db.animal.count({
+                where: {
+                    createdById: requiredAdminId(),
+                },
+            });
+
+            const beforeLogCount = await db.animalChangeLog.count({
+                where: {
+                    changedById: requiredAdminId(),
+                },
+            });
+
+            const response = await requestPastureAssignment(
+                animalId,
+                pastureId,
+            );
+
+            expect(response.status).toBe(404);
+
+            expect(await response.json()).toEqual({
+                error: "El animal solicitado no existe.",
+            });
+
+            const afterAnimalCount = await db.animal.count({
+                where: {
+                    createdById: requiredAdminId(),
+                },
+            });
+
+            const afterLogCount = await db.animalChangeLog.count({
+                where: {
+                    changedById: requiredAdminId(),
+                },
+            });
+
+            expect(afterAnimalCount).toBe(beforeAnimalCount);
+            expect(afterLogCount).toBe(beforeLogCount);
+        },
+    );
 });
