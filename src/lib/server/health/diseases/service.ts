@@ -5,11 +5,13 @@ import { db } from "../../db";
 import {
   DiseaseConflictError,
   DiseaseValidationError,
+  DiseaseNotFoundError,
 } from "./errors";
 
 import {
   CreateDiseaseInput,
   ListDiseasesQuery,
+  UpdateDiseaseInput,
 } from "./validation";
 
 export type DiseaseListItem = {
@@ -129,4 +131,54 @@ export async function listDiseases(
     pageSize: query.pageSize,
     total,
   };
+}
+
+export async function updateDisease(
+  id: string,
+  input: UpdateDiseaseInput,
+  updatedById: string,
+): Promise<DiseaseListItem> {
+  const existingDisease = await db.disease.findFirst({
+    where: {
+      id,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingDisease) {
+    throw new DiseaseNotFoundError();
+  }
+
+  try {
+    const disease = await db.disease.update({
+      where: {
+        id,
+      },
+      data: {
+        name: input.name,
+        description: input.description,
+        isActive: input.isActive,
+        updatedById,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        isActive: true,
+      },
+    });
+
+    return disease;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new DiseaseConflictError();
+    }
+
+    throw error;
+  }
 }

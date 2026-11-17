@@ -9,6 +9,10 @@ import {
     POST as createDiseaseRoute,
 } from "../../src/app/api/health/diseases/route";
 
+import {
+    PATCH as updateDiseaseRoute,
+} from "../../src/app/api/health/diseases/[id]/route";
+
 import { randomUUID } from "node:crypto";
 
 import {
@@ -244,6 +248,51 @@ describe("creacion de enfermedades", () => {
         });
 
         return listDiseasesRoute(request);
+    }
+
+    async function requestDiseaseUpdate(
+        diseaseId: string,
+        body: unknown,
+        originOverride?: string | null,
+    ): Promise<Response> {
+        const allowedOrigin = process.env.AUTH_ALLOWED_ORIGINS
+            ?.split(",")
+            .map((value) => value.trim())
+            .find((value) => value.length > 0);
+
+        if (!allowedOrigin) {
+            throw new Error(
+                "AUTH_ALLOWED_ORIGINS debe estar definido para probar el endpoint de enfermedades.",
+            );
+        }
+
+        const origin =
+            originOverride === undefined
+                ? allowedOrigin
+                : originOverride;
+
+        const headers = new Headers({
+            "Content-Type": "application/json",
+        });
+
+        if (origin !== null) {
+            headers.set("Origin", origin);
+        }
+
+        const request = new NextRequest(
+            new URL(`/api/health/diseases/${diseaseId}`, allowedOrigin),
+            {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify(body),
+            },
+        );
+
+        return updateDiseaseRoute(request, {
+            params: Promise.resolve({
+                id: diseaseId,
+            }),
+        });
     }
 
     it("crea una enfermedad activa con descripción", async () => {
@@ -807,4 +856,416 @@ describe("creacion de enfermedades", () => {
             });
         },
     );
+
+    it("PATCH actualiza el nombre, la descripción y el estado", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad original-${randomUUID()}`,
+                description: "Descripción original.",
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const newName = `Enfermedad actualizada-${randomUUID()}`;
+
+        const response = await requestDiseaseUpdate(disease.id, {
+            name: newName,
+            description: "Descripción actualizada.",
+            isActive: false,
+        });
+
+        expect(response.status).toBe(200);
+
+        const responseBody = await response.json();
+
+        expect(responseBody).toMatchObject({
+            disease: {
+                id: disease.id,
+                name: newName,
+                description: "Descripción actualizada.",
+                isActive: false,
+            },
+        });
+
+        const stored = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(stored.name).toBe(newName);
+        expect(stored.description).toBe("Descripción actualizada.");
+        expect(stored.isActive).toBe(false);
+        expect(stored.updatedById).toBe(requiredAdminId());
+    });
+
+    it("PATCH actualiza solo el estado activo", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad estado-${randomUUID()}`,
+                description: "Descripción sin cambios.",
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseUpdate(disease.id, {
+            isActive: false,
+        });
+
+        expect(response.status).toBe(200);
+
+        const responseBody = await response.json();
+
+        expect(responseBody).toMatchObject({
+            disease: {
+                id: disease.id,
+                name: disease.name,
+                description: "Descripción sin cambios.",
+                isActive: false,
+            },
+        });
+    });
+
+    it("PATCH rechaza la actualización sin sesión y conserva los datos", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad sin sesion-${randomUUID()}`,
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        const before = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        const response = await requestDiseaseUpdate(disease.id, {
+            name: `Enfermedad cambiada-${randomUUID()}`,
+        });
+
+        expect(response.status).toBe(401);
+
+        expect(await response.json()).toEqual({
+            error: "No hay una sesión activa.",
+        });
+
+        const after = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(after.name).toBe(before.name);
+        expect(after.isActive).toBe(true);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+    });
+
+    it("PATCH impide que un lector actualice enfermedades y conserva los datos", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad lector-${randomUUID()}`,
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("READER");
+
+        const before = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        const response = await requestDiseaseUpdate(disease.id, {
+            name: `Enfermedad cambiada por lector-${randomUUID()}`,
+        });
+
+        expect(response.status).toBe(403);
+
+        expect(await response.json()).toEqual({
+            error: "No tienes permiso para modificar enfermedades.",
+        });
+
+        const after = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(after.name).toBe(before.name);
+        expect(after.isActive).toBe(true);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+    });
+
+    it.each(["ADMIN", "SUPERVISOR"] as const)(
+        "PATCH permite que %s actualice una enfermedad",
+        async (role) => {
+            const disease = await createDisease(
+                {
+                    name: `Enfermedad actualizable ${role}-${randomUUID()}`,
+                },
+                requiredAdminId(),
+            );
+
+            await authenticateRouteUser(role);
+
+            const newName = `Enfermedad actualizada ${role}-${randomUUID()}`;
+
+            const response = await requestDiseaseUpdate(disease.id, {
+                name: newName,
+            });
+
+            expect(response.status).toBe(200);
+
+            const responseBody = await response.json();
+
+            expect(responseBody).toMatchObject({
+                disease: {
+                    id: disease.id,
+                    name: newName,
+                },
+            });
+
+            const stored = await db.disease.findUniqueOrThrow({
+                where: {
+                    id: disease.id,
+                },
+            });
+
+            expect(stored.name).toBe(newName);
+            expect(stored.updatedById).toBe(requiredAdminId());
+        },
+    );
+
+    it.each([
+        {
+            label: "sin encabezado Origin",
+            origin: null,
+        },
+        {
+            label: "con un origen no autorizado",
+            origin: "https://origen-no-autorizado.invalid",
+        },
+    ])(
+        "PATCH rechaza la actualización $label y conserva los datos",
+        async ({ origin }) => {
+            const disease = await createDisease(
+                {
+                    name: `Enfermedad origen-${randomUUID()}`,
+                    isActive: true,
+                },
+                requiredAdminId(),
+            );
+
+            await authenticateRouteUser("ADMIN");
+
+            const before = await db.disease.findUniqueOrThrow({
+                where: {
+                    id: disease.id,
+                },
+            });
+
+            const response = await requestDiseaseUpdate(
+                disease.id,
+                {
+                    name: `Enfermedad cambiada-${randomUUID()}`,
+                },
+                origin,
+            );
+
+            expect(response.status).toBe(403);
+
+            expect(await response.json()).toEqual({
+                error: "Origen no autorizado para esta operación.",
+            });
+
+            const after = await db.disease.findUniqueOrThrow({
+                where: {
+                    id: disease.id,
+                },
+            });
+
+            expect(after.name).toBe(before.name);
+            expect(after.isActive).toBe(true);
+            expect(after.updatedById).toBe(before.updatedById);
+            expect(after.updatedAt).toEqual(before.updatedAt);
+        },
+    );
+
+    it("PATCH rechaza un identificador inválido sin modificar datos", async () => {
+        await authenticateRouteUser("ADMIN");
+
+        const beforeCount = await db.disease.count({
+            where: {
+                createdById: requiredAdminId(),
+            },
+        });
+
+        const response = await requestDiseaseUpdate(
+            "identificador-invalido",
+            {
+                name: `Enfermedad id invalido-${randomUUID()}`,
+            },
+        );
+
+        expect(response.status).toBe(400);
+
+        expect(await response.json()).toMatchObject({
+            error: "Datos de enfermedad invalidos.",
+            details: {
+                id: ["El identificador de la enfermedad no es válido."],
+            },
+        });
+
+        const afterCount = await db.disease.count({
+            where: {
+                createdById: requiredAdminId(),
+            },
+        });
+
+        expect(afterCount).toBe(beforeCount);
+    });
+
+    it("PATCH rechaza una enfermedad inexistente", async () => {
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseUpdate(randomUUID(), {
+            name: `Enfermedad inexistente-${randomUUID()}`,
+        });
+
+        expect(response.status).toBe(404);
+
+        expect(await response.json()).toEqual({
+            error: "La enfermedad no existe.",
+        });
+    });
+
+    it.each([
+        {
+            label: "sin campos para actualizar",
+            body: {},
+        },
+        {
+            label: "con un nombre vacío",
+            body: {
+                name: "",
+            },
+        },
+        {
+            label: "con un nombre demasiado largo",
+            body: {
+                name: "a".repeat(121),
+            },
+        },
+        {
+            label: "con una descripción demasiado larga",
+            body: {
+                description: "a".repeat(1001),
+            },
+        },
+        {
+            label: "con campos adicionales",
+            body: {
+                name: `Enfermedad campos adicionales-${randomUUID()}`,
+                farmId: 2,
+            },
+        },
+    ])(
+        "PATCH rechaza el cuerpo $label y conserva los datos",
+        async ({ body }) => {
+            const disease = await createDisease(
+                {
+                    name: `Enfermedad validacion-${randomUUID()}`,
+                    description: "Descripción original.",
+                    isActive: true,
+                },
+                requiredAdminId(),
+            );
+
+            await authenticateRouteUser("ADMIN");
+
+            const before = await db.disease.findUniqueOrThrow({
+                where: {
+                    id: disease.id,
+                },
+            });
+
+            const response = await requestDiseaseUpdate(disease.id, body);
+
+            expect(response.status).toBe(400);
+
+            expect(await response.json()).toMatchObject({
+                error: "Datos de enfermedad invalidos.",
+            });
+
+            const after = await db.disease.findUniqueOrThrow({
+                where: {
+                    id: disease.id,
+                },
+            });
+
+            expect(after.name).toBe(before.name);
+            expect(after.description).toBe(before.description);
+            expect(after.isActive).toBe(true);
+            expect(after.updatedById).toBe(before.updatedById);
+            expect(after.updatedAt).toEqual(before.updatedAt);
+        },
+    );
+
+    it("PATCH rechaza un nombre duplicado con 409 y conserva los datos", async () => {
+        const existingName = `Enfermedad existente-${randomUUID()}`;
+
+        await createDisease(
+            {
+                name: existingName,
+            },
+            requiredAdminId(),
+        );
+
+        const disease = await createDisease(
+            {
+                name: `Enfermedad a duplicar-${randomUUID()}`,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const before = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        const response = await requestDiseaseUpdate(disease.id, {
+            name: existingName,
+        });
+
+        expect(response.status).toBe(409);
+
+        expect(await response.json()).toEqual({
+            error: "Ya existe una enfermedad con ese nombre.",
+        });
+
+        const after = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(after.name).toBe(before.name);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+    });
 });
