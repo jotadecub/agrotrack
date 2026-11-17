@@ -5,6 +5,7 @@ import {
 } from "../../src/lib/server/auth/session-service";
 
 import {
+    GET as listDiseasesRoute,
     POST as createDiseaseRoute,
 } from "../../src/app/api/health/diseases/route";
 
@@ -214,6 +215,35 @@ describe("creacion de enfermedades", () => {
         );
 
         return createDiseaseRoute(request);
+    }
+
+    async function requestDiseaseList(
+        searchParams: Record<string, string | undefined> = {},
+    ): Promise<Response> {
+        const allowedOrigin = process.env.AUTH_ALLOWED_ORIGINS
+            ?.split(",")
+            .map((value) => value.trim())
+            .find((value) => value.length > 0);
+
+        if (!allowedOrigin) {
+            throw new Error(
+                "AUTH_ALLOWED_ORIGINS debe estar definido para probar el endpoint de enfermedades.",
+            );
+        }
+
+        const url = new URL("/api/health/diseases", allowedOrigin);
+
+        for (const [key, value] of Object.entries(searchParams)) {
+            if (value !== undefined) {
+                url.searchParams.set(key, value);
+            }
+        }
+
+        const request = new NextRequest(url, {
+            method: "GET",
+        });
+
+        return listDiseasesRoute(request);
     }
 
     it("crea una enfermedad activa con descripción", async () => {
@@ -555,4 +585,226 @@ describe("creacion de enfermedades", () => {
 
         expect(afterCount).toBe(beforeCount);
     });
+
+    it("GET lista enfermedades para un administrador", async () => {
+        const firstName = `Enfermedad lista A-${randomUUID()}`;
+        const secondName = `Enfermedad lista B-${randomUUID()}`;
+
+        await createDisease(
+            {
+                name: firstName,
+            },
+            requiredAdminId(),
+        );
+
+        await createDisease(
+            {
+                name: secondName,
+                isActive: false,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseList();
+
+        expect(response.status).toBe(200);
+
+        const responseBody = await response.json();
+
+        expect(responseBody.page).toBe(1);
+        expect(responseBody.pageSize).toBe(20);
+        expect(responseBody.total).toBeGreaterThanOrEqual(2);
+
+        const names = responseBody.items.map(
+            (item: { name: string }) => item.name,
+        );
+
+        expect(names).toContain(firstName);
+        expect(names).toContain(secondName);
+    });
+
+    it("GET filtra enfermedades por búsqueda", async () => {
+        const matchingName = `Enfermedad buscable-${randomUUID()}`;
+        const otherName = `Enfermedad diferente-${randomUUID()}`;
+
+        await createDisease(
+            {
+                name: matchingName,
+            },
+            requiredAdminId(),
+        );
+
+        await createDisease(
+            {
+                name: otherName,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseList({
+            search: "buscable",
+        });
+
+        expect(response.status).toBe(200);
+
+        const responseBody = await response.json();
+
+        const names = responseBody.items.map(
+            (item: { name: string }) => item.name,
+        );
+
+        expect(names).toContain(matchingName);
+        expect(names).not.toContain(otherName);
+    });
+
+    it("GET filtra enfermedades por estado activo", async () => {
+        const activeName = `Enfermedad activa filtro-${randomUUID()}`;
+        const inactiveName = `Enfermedad inactiva filtro-${randomUUID()}`;
+
+        await createDisease(
+            {
+                name: activeName,
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        await createDisease(
+            {
+                name: inactiveName,
+                isActive: false,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseList({
+            isActive: "true",
+        });
+
+        expect(response.status).toBe(200);
+
+        const responseBody = await response.json();
+
+        const names = responseBody.items.map(
+            (item: { name: string }) => item.name,
+        );
+
+        expect(names).toContain(activeName);
+        expect(names).not.toContain(inactiveName);
+
+        for (const item of responseBody.items) {
+            expect(item.isActive).toBe(true);
+        }
+    });
+
+    it("GET pagina los resultados", async () => {
+        for (let index = 0; index < 3; index += 1) {
+            await createDisease(
+                {
+                    name: `Enfermedad paginada ${index}-${randomUUID()}`,
+                },
+                requiredAdminId(),
+            );
+        }
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseList({
+            page: "1",
+            pageSize: "2",
+        });
+
+        expect(response.status).toBe(200);
+
+        const responseBody = await response.json();
+
+        expect(responseBody.page).toBe(1);
+        expect(responseBody.pageSize).toBe(2);
+        expect(responseBody.items).toHaveLength(2);
+        expect(responseBody.total).toBeGreaterThanOrEqual(3);
+    });
+
+    it.each(["ADMIN", "SUPERVISOR", "READER"] as const)(
+        "GET permite que %s liste enfermedades",
+        async (role) => {
+            const name = `Enfermedad lectura ${role}-${randomUUID()}`;
+
+            await createDisease(
+                {
+                    name,
+                },
+                requiredAdminId(),
+            );
+
+            await authenticateRouteUser(role);
+
+            const response = await requestDiseaseList();
+
+            expect(response.status).toBe(200);
+
+            const responseBody = await response.json();
+
+            const names = responseBody.items.map(
+                (item: { name: string }) => item.name,
+            );
+
+            expect(names).toContain(name);
+        },
+    );
+
+    it("GET rechaza la consulta sin sesión", async () => {
+        const response = await requestDiseaseList();
+
+        expect(response.status).toBe(401);
+
+        expect(await response.json()).toEqual({
+            error: "No hay una sesión activa.",
+        });
+    });
+
+    it.each([
+        {
+            label: "con una página inválida",
+            searchParams: {
+                page: "0",
+            },
+        },
+        {
+            label: "con un tamaño de página inválido",
+            searchParams: {
+                pageSize: "0",
+            },
+        },
+        {
+            label: "con un tamaño de página excesivo",
+            searchParams: {
+                pageSize: "101",
+            },
+        },
+        {
+            label: "con un estado inválido",
+            searchParams: {
+                isActive: "tal vez",
+            },
+        },
+    ])(
+        "GET rechaza la consulta $label",
+        async ({ searchParams }) => {
+            await authenticateRouteUser("ADMIN");
+
+            const response = await requestDiseaseList(searchParams);
+
+            expect(response.status).toBe(400);
+
+            expect(await response.json()).toMatchObject({
+                error: "Parámetros de consulta invalidos.",
+            });
+        },
+    );
 });

@@ -9,6 +9,7 @@ import {
 
 import {
   CreateDiseaseInput,
+  ListDiseasesQuery,
 } from "./validation";
 
 export type DiseaseListItem = {
@@ -77,4 +78,55 @@ export async function createDisease(
 
     throw error;
   }
+}
+
+export async function listDiseases(
+  query: ListDiseasesQuery,
+): Promise<{
+  items: DiseaseListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+}> {
+  const where: Prisma.DiseaseWhereInput = {};
+
+  if (query.isActive !== undefined) {
+    where.isActive = query.isActive;
+  }
+
+  if (query.search) {
+    where.name = {
+      contains: query.search,
+      mode: "insensitive",
+    };
+  }
+
+  const [diseases, total] = await Promise.all([
+    db.disease.findMany({
+      where,
+      orderBy: [
+        {
+          createdAt: "desc",
+        },
+      ],
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        isActive: true,
+      },
+    }),
+    db.disease.count({
+      where,
+    }),
+  ]);
+
+  return {
+    items: diseases,
+    page: query.page,
+    pageSize: query.pageSize,
+    total,
+  };
 }
