@@ -219,3 +219,26 @@ export async function deleteDisease(
 
   return disease;
 }
+
+export async function getDiseaseById(
+  id: string,
+): Promise<DiseaseListItem> {
+  const disease = await db.disease.findFirst({
+    where: {
+      id,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      isActive: true,
+    },
+  });
+
+  if (!disease) {
+    throw new DiseaseNotFoundError();
+  }
+
+  return disease;
+}

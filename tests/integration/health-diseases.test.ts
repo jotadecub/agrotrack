@@ -12,6 +12,7 @@ import {
 import {
     DELETE as deleteDiseaseRoute,
     PATCH as updateDiseaseRoute,
+    GET as getDiseaseRoute,
 } from "../../src/app/api/health/diseases/[id]/route";
 
 import { randomUUID } from "node:crypto";
@@ -318,6 +319,34 @@ describe("creacion de enfermedades", () => {
         );
 
         return deleteDiseaseRoute(request, {
+            params: Promise.resolve({
+                id: diseaseId,
+            }),
+        });
+    }
+
+    async function requestDiseaseDetail(
+        diseaseId: string,
+    ): Promise<Response> {
+        const allowedOrigin = process.env.AUTH_ALLOWED_ORIGINS
+            ?.split(",")
+            .map((value) => value.trim())
+            .find((value) => value.length > 0);
+
+        if (!allowedOrigin) {
+            throw new Error(
+                "AUTH_ALLOWED_ORIGINS debe estar definido para probar el endpoint de enfermedades.",
+            );
+        }
+
+        const request = new NextRequest(
+            new URL(`/api/health/diseases/${diseaseId}`, allowedOrigin),
+            {
+                method: "GET",
+            },
+        );
+
+        return getDiseaseRoute(request, {
             params: Promise.resolve({
                 id: diseaseId,
             }),
@@ -1519,5 +1548,125 @@ describe("creacion de enfermedades", () => {
         expect(after.isActive).toBe(false);
         expect(after.updatedById).toBe(before.updatedById);
         expect(after.updatedAt).toEqual(before.updatedAt);
+    });
+
+    it("GET obtiene el detalle de una enfermedad activa", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad detalle-${randomUUID()}`,
+                description: "Descripción de la enfermedad.",
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseDetail(disease.id);
+
+        expect(response.status).toBe(200);
+
+        expect(await response.json()).toMatchObject({
+            disease: {
+                id: disease.id,
+                name: disease.name,
+                description: "Descripción de la enfermedad.",
+                isActive: true,
+            },
+        });
+    });
+
+    it("GET rechaza la consulta sin sesión", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad detalle sin sesion-${randomUUID()}`,
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        const response = await requestDiseaseDetail(disease.id);
+
+        expect(response.status).toBe(401);
+
+        expect(await response.json()).toEqual({
+            error: "No hay una sesión activa.",
+        });
+    });
+
+    it.each(["ADMIN", "SUPERVISOR", "READER"] as const)(
+        "GET permite que %s obtenga el detalle de una enfermedad",
+        async (role) => {
+            const disease = await createDisease(
+                {
+                    name: `Enfermedad detalle ${role}-${randomUUID()}`,
+                    isActive: true,
+                },
+                requiredAdminId(),
+            );
+
+            await authenticateRouteUser(role);
+
+            const response = await requestDiseaseDetail(disease.id);
+
+            expect(response.status).toBe(200);
+
+            expect(await response.json()).toMatchObject({
+                disease: {
+                    id: disease.id,
+                    name: disease.name,
+                    isActive: true,
+                },
+            });
+        },
+    );
+
+    it("GET rechaza un identificador inválido", async () => {
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseDetail(
+            "identificador-invalido",
+        );
+
+        expect(response.status).toBe(400);
+
+        expect(await response.json()).toMatchObject({
+            error: "Datos de enfermedad invalidos.",
+            details: {
+                id: ["El identificador de la enfermedad no es válido."],
+            },
+        });
+    });
+
+    it("GET rechaza una enfermedad inexistente", async () => {
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseDetail(randomUUID());
+
+        expect(response.status).toBe(404);
+
+        expect(await response.json()).toEqual({
+            error: "La enfermedad no existe.",
+        });
+    });
+
+    it("GET rechaza una enfermedad desactivada", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad detalle inactiva-${randomUUID()}`,
+                isActive: false,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseDetail(disease.id);
+
+        expect(response.status).toBe(404);
+
+        expect(await response.json()).toEqual({
+            error: "La enfermedad no existe.",
+        });
     });
 });

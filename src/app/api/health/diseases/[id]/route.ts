@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { cookies } from "next/headers";
 
 import {
+    assertCanReadData,
     assertCanManageOperationalData,
     ForbiddenError,
 } from "@/lib/server/auth/authorization";
@@ -14,7 +15,8 @@ import {
 } from "@/lib/server/health/diseases/errors";
 import {
     updateDisease,
-    deleteDisease
+    deleteDisease,
+    getDiseaseById,
 } from "@/lib/server/health/diseases/service";
 import {
     updateDiseaseSchema,
@@ -32,6 +34,95 @@ type RouteContext = {
         id: string;
     }>;
 };
+
+export async function GET(
+    _request: NextRequest,
+    context: RouteContext,
+) {
+    try {
+        const { id } = await context.params;
+
+        const uuidRegex =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (!uuidRegex.test(id)) {
+            return NextResponse.json(
+                {
+                    error: "Datos de enfermedad invalidos.",
+                    details: {
+                        id: ["El identificador de la enfermedad no es válido."],
+                    },
+                },
+                {
+                    status: 400,
+                },
+            );
+        }
+
+        const cookieStore = await cookies();
+
+        const accessToken = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+
+        if (!accessToken) {
+            return NextResponse.json(
+                {
+                    error: "No hay una sesión activa.",
+                },
+                {
+                    status: 401,
+                },
+            );
+        }
+
+        const authenticated = await validateAccessToken(accessToken, {
+            recordActivity: false,
+        });
+
+        if (!authenticated) {
+            return NextResponse.json(
+                {
+                    error: "La sesión no es válida.",
+                },
+                {
+                    status: 401,
+                },
+            );
+        }
+
+        assertCanReadData(authenticated.user.role);
+
+        const disease = await getDiseaseById(id);
+
+        return NextResponse.json(
+            {
+                disease,
+            },
+            {
+                status: 200,
+            },
+        );
+    } catch (error) {
+        if (error instanceof DiseaseNotFoundError) {
+            return NextResponse.json(
+                {
+                    error: error.message,
+                },
+                {
+                    status: 404,
+                },
+            );
+        }
+
+        return NextResponse.json(
+            {
+                error: "No fue posible obtener la enfermedad.",
+            },
+            {
+                status: 500,
+            },
+        );
+    }
+}
 
 export async function PATCH(
     request: NextRequest,
