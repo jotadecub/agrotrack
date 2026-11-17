@@ -182,3 +182,40 @@ export async function updateDisease(
     throw error;
   }
 }
+
+export async function deleteDisease(
+  id: string,
+  deletedById: string,
+): Promise<DiseaseListItem> {
+  const existingDisease = await db.disease.findFirst({
+    where: {
+      id,
+      isActive: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingDisease) {
+    throw new DiseaseNotFoundError();
+  }
+
+  const disease = await db.disease.update({
+    where: {
+      id,
+    },
+    data: {
+      isActive: false,
+      updatedById: deletedById,
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      isActive: true,
+    },
+  });
+
+  return disease;
+}

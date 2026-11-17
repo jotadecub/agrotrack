@@ -10,6 +10,7 @@ import {
 } from "../../src/app/api/health/diseases/route";
 
 import {
+    DELETE as deleteDiseaseRoute,
     PATCH as updateDiseaseRoute,
 } from "../../src/app/api/health/diseases/[id]/route";
 
@@ -289,6 +290,34 @@ describe("creacion de enfermedades", () => {
         );
 
         return updateDiseaseRoute(request, {
+            params: Promise.resolve({
+                id: diseaseId,
+            }),
+        });
+    }
+
+    async function requestDiseaseDeletion(
+        diseaseId: string,
+    ): Promise<Response> {
+        const allowedOrigin = process.env.AUTH_ALLOWED_ORIGINS
+            ?.split(",")
+            .map((value) => value.trim())
+            .find((value) => value.length > 0);
+
+        if (!allowedOrigin) {
+            throw new Error(
+                "AUTH_ALLOWED_ORIGINS debe estar definido para probar el endpoint de enfermedades.",
+            );
+        }
+
+        const request = new NextRequest(
+            new URL(`/api/health/diseases/${diseaseId}`, allowedOrigin),
+            {
+                method: "DELETE",
+            },
+        );
+
+        return deleteDiseaseRoute(request, {
             params: Promise.resolve({
                 id: diseaseId,
             }),
@@ -1265,6 +1294,229 @@ describe("creacion de enfermedades", () => {
         });
 
         expect(after.name).toBe(before.name);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+    });
+
+    it("DELETE desactiva una enfermedad y conserva sus datos", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad eliminable-${randomUUID()}`,
+                description: "Descripción de la enfermedad.",
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseDeletion(disease.id);
+
+        expect(response.status).toBe(200);
+
+        const responseBody = await response.json();
+
+        expect(responseBody).toMatchObject({
+            disease: {
+                id: disease.id,
+                name: disease.name,
+                description: "Descripción de la enfermedad.",
+                isActive: false,
+            },
+        });
+
+        const stored = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(stored.isActive).toBe(false);
+        expect(stored.updatedById).toBe(requiredAdminId());
+    });
+
+    it("DELETE rechaza la eliminación sin sesión y conserva los datos", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad eliminar sin sesion-${randomUUID()}`,
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        const before = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        const response = await requestDiseaseDeletion(disease.id);
+
+        expect(response.status).toBe(401);
+
+        expect(await response.json()).toEqual({
+            error: "No hay una sesión activa.",
+        });
+
+        const after = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(after.isActive).toBe(true);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+    });
+
+    it("DELETE impide que un lector elimine enfermedades y conserva los datos", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad eliminar lector-${randomUUID()}`,
+                isActive: true,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("READER");
+
+        const before = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        const response = await requestDiseaseDeletion(disease.id);
+
+        expect(response.status).toBe(403);
+
+        expect(await response.json()).toEqual({
+            error: "No tienes permiso para eliminar enfermedades.",
+        });
+
+        const after = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(after.isActive).toBe(true);
+        expect(after.updatedById).toBe(before.updatedById);
+        expect(after.updatedAt).toEqual(before.updatedAt);
+    });
+
+    it.each(["ADMIN", "SUPERVISOR"] as const)(
+        "DELETE permite que %s desactive una enfermedad",
+        async (role) => {
+            const disease = await createDisease(
+                {
+                    name: `Enfermedad eliminar ${role}-${randomUUID()}`,
+                    isActive: true,
+                },
+                requiredAdminId(),
+            );
+
+            await authenticateRouteUser(role);
+
+            const response = await requestDiseaseDeletion(disease.id);
+
+            expect(response.status).toBe(200);
+
+            const responseBody = await response.json();
+
+            expect(responseBody).toMatchObject({
+                disease: {
+                    id: disease.id,
+                    isActive: false,
+                },
+            });
+
+            const stored = await db.disease.findUniqueOrThrow({
+                where: {
+                    id: disease.id,
+                },
+            });
+
+            expect(stored.isActive).toBe(false);
+            expect(stored.updatedById).toBe(requiredAdminId());
+        },
+    );
+
+    it("DELETE rechaza un identificador inválido sin modificar datos", async () => {
+        await authenticateRouteUser("ADMIN");
+
+        const beforeCount = await db.disease.count({
+            where: {
+                createdById: requiredAdminId(),
+            },
+        });
+
+        const response = await requestDiseaseDeletion(
+            "identificador-invalido",
+        );
+
+        expect(response.status).toBe(400);
+
+        expect(await response.json()).toMatchObject({
+            error: "Datos de enfermedad invalidos.",
+            details: {
+                id: ["El identificador de la enfermedad no es válido."],
+            },
+        });
+
+        const afterCount = await db.disease.count({
+            where: {
+                createdById: requiredAdminId(),
+            },
+        });
+
+        expect(afterCount).toBe(beforeCount);
+    });
+
+    it("DELETE rechaza una enfermedad inexistente", async () => {
+        await authenticateRouteUser("ADMIN");
+
+        const response = await requestDiseaseDeletion(randomUUID());
+
+        expect(response.status).toBe(404);
+
+        expect(await response.json()).toEqual({
+            error: "La enfermedad no existe.",
+        });
+    });
+
+    it("DELETE rechaza una enfermedad ya desactivada", async () => {
+        const disease = await createDisease(
+            {
+                name: `Enfermedad ya inactiva-${randomUUID()}`,
+                isActive: false,
+            },
+            requiredAdminId(),
+        );
+
+        await authenticateRouteUser("ADMIN");
+
+        const before = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        const response = await requestDiseaseDeletion(disease.id);
+
+        expect(response.status).toBe(404);
+
+        expect(await response.json()).toEqual({
+            error: "La enfermedad no existe.",
+        });
+
+        const after = await db.disease.findUniqueOrThrow({
+            where: {
+                id: disease.id,
+            },
+        });
+
+        expect(after.isActive).toBe(false);
         expect(after.updatedById).toBe(before.updatedById);
         expect(after.updatedAt).toEqual(before.updatedAt);
     });
