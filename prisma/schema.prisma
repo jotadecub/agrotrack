@@ -16,6 +16,7 @@ model Farm {
   animals  Animal[]
   pastures Pasture[]
   diseases Disease[]
+  diagnoses Diagnosis[]
 
   @@map("farm")
 }
@@ -61,6 +62,9 @@ model User {
 
   diseasesCreated Disease[] @relation("DiseasesCreatedBy")
   diseasesUpdated Disease[] @relation("DiseasesUpdatedBy")
+
+  diagnosesCreated Diagnosis[] @relation("DiagnosesCreatedBy")
+  diagnosesUpdated Diagnosis[] @relation("DiagnosesUpdatedBy")
 
   @@map("app_user")
 }
@@ -171,6 +175,8 @@ model Animal {
 
   changeLogs AnimalChangeLog[]
 
+  diagnoses Diagnosis[]
+
   @@index([farmId, status])
   @@index([speciesId])
   @@index([breedId])
@@ -245,7 +251,36 @@ model Disease {
   createdBy User  @relation("DiseasesCreatedBy", fields: [createdById], references: [id])
   updatedBy User? @relation("DiseasesUpdatedBy", fields: [updatedById], references: [id])
 
+  diagnoses Diagnosis[]
+
   @@unique([farmId, name])
   @@index([farmId, isActive])
   @@map("diseases")
+}
+
+model Diagnosis {
+  id          String   @id @default(uuid())
+  farmId      Int
+  animalId    String   @db.Uuid
+  diseaseId   String
+  diagnosedAt DateTime @db.Date
+  notes       String?
+  isActive    Boolean  @default(true)
+
+  createdById String  @db.Uuid
+  updatedById String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  farm      Farm  @relation(fields: [farmId], references: [id])
+  animal    Animal @relation(fields: [animalId], references: [id])
+  disease   Disease @relation(fields: [diseaseId], references: [id])
+  createdBy User  @relation("DiagnosesCreatedBy", fields: [createdById], references: [id])
+  updatedBy User? @relation("DiagnosesUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([farmId, isActive])
+  @@index([animalId, diagnosedAt])
+  @@index([diseaseId])
+  @@map("diagnoses")
 }
